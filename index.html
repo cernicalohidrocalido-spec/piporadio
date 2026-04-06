@@ -1409,25 +1409,53 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
       </div>
     </div>
 
-    <!-- SUNO API — Generación de música real -->
+    <!-- SUNO API — gcui-art/suno-api -->
     <div class="card" style="margin-bottom:14px;border-color:rgba(212,175,55,.25)">
-      <div class="card-title"><i class="fas fa-music" style="color:var(--gold)"></i> Suno API — Música de calidad profesional real
+      <div class="card-title"><i class="fas fa-music" style="color:var(--gold)"></i> Suno — Música real de calidad profesional
         <span class="api-tier-badge">⭐ Recomendado</span>
       </div>
-      <div class="api-banner" style="background:linear-gradient(135deg,rgba(212,175,55,.1),rgba(245,158,11,.06));border-color:rgba(212,175,55,.25)">
-        <strong style="color:var(--gold)">🎵 Suno — Audio profesional real</strong>
-        Con tu API key, PipoRadio enviará el prompt generado a Suno y recibirás audio de calidad de estudio real en lugar de síntesis local.
-        <a href="https://suno.com/api" target="_blank" style="color:var(--gold2)">Obtener acceso API →</a>
-      </div>
-      <div class="ig">
-        <div class="lbl">Suno API Key</div>
-        <div style="display:flex;gap:8px">
-          <input class="inp" id="sunoKey" type="password" placeholder="suno-..." style="flex:1" oninput="checkAPIStatus('suno',this.value)">
-          <button class="btn btn-green" onclick="testSunoKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
+
+      <!-- Step 1: Cookie -->
+      <div style="background:var(--bg3);border:1px solid rgba(212,175,55,.18);border-radius:var(--rs);padding:12px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px">① Obtener tu Cookie de Suno</div>
+        <div style="font-size:11.5px;color:var(--txt2);line-height:1.75;margin-bottom:8px">
+          1. Ve a <a href="https://suno.com/create" target="_blank" style="color:var(--gold2)">suno.com/create</a> en Chrome<br>
+          2. Presiona <strong style="color:var(--txt)">F12</strong> → pestaña <strong style="color:var(--txt)">Network</strong><br>
+          3. Recarga la página (F5)<br>
+          4. Busca una petición con <strong style="color:var(--txt)">__clerk_api_version</strong><br>
+          5. Clic en ella → Headers → copia el valor de <strong style="color:var(--txt)">Cookie</strong>
+        </div>
+        <div class="ig" style="margin-bottom:0">
+          <div class="lbl">Cookie de Suno (larga cadena)</div>
+          <textarea class="inp" id="sunoCookie" rows="3" placeholder="__client=...; __session=...; _cfuvid=..." style="font-size:10px;font-family:var(--fm);resize:vertical" oninput="checkAPIStatus('suno',this.value)"></textarea>
         </div>
       </div>
+
+      <!-- Step 2: Vercel URL -->
+      <div style="background:var(--bg3);border:1px solid rgba(212,175,55,.18);border-radius:var(--rs);padding:12px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px">② Desplegar suno-api en Vercel (gratis)</div>
+        <div style="font-size:11.5px;color:var(--txt2);line-height:1.75;margin-bottom:8px">
+          1. Clic en el botón azul de abajo<br>
+          2. En Vercel: pon tu Cookie en <strong style="color:var(--txt)">SUNO_COOKIE</strong><br>
+          3. Despliega y copia la URL que te da Vercel<br>
+          4. Pégala aquí abajo
+        </div>
+        <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgcui-art%2Fsuno-api&env=SUNO_COOKIE,TWOCAPTCHA_KEY,BROWSER,BROWSER_GHOST_CURSOR,BROWSER_LOCALE,BROWSER_HEADLESS&project-name=suno-api&repository-name=suno-api"
+           target="_blank"
+           style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#0070f3;color:#fff;border-radius:var(--rs);font-size:12px;font-weight:700;text-decoration:none;margin-bottom:10px">
+          ▲ Deploy to Vercel — gratis en 3 min
+        </a>
+        <div class="ig" style="margin-bottom:0">
+          <div class="lbl">URL de tu suno-api en Vercel</div>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="sunoKey" type="text" placeholder="https://suno-api-xxxx.vercel.app" style="flex:1;font-family:var(--fm);font-size:12px" oninput="checkAPIStatus('suno',this.value)">
+            <button class="btn btn-green" onclick="testSunoKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
+          </div>
+        </div>
+      </div>
+
       <div class="tog" id="tog-suno-enabled">
-        <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar Suno para generación (en lugar de síntesis local)</div>
+        <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar Suno para generación (audio profesional real)</div>
         <div class="sw" id="sw-suno" onclick="toggleSunoMode(this)"></div>
       </div>
     </div>
@@ -1778,6 +1806,7 @@ function saveAPIKeys(){
   const get = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
   const keys = {
     anthropic: get('anthropicKey'), suno: get('sunoKey'),
+    sunoCookie: get('sunoCookie'),
     eleven: get('elevenKey'), moises: get('moisesKey'), dolby: get('dolbyKey'),
   };
   localStorage.setItem('pr_apikeys', JSON.stringify(keys));
@@ -1792,7 +1821,7 @@ function loadAPIKeys(){
   try{
     const keys = JSON.parse(localStorage.getItem('pr_apikeys')||'{}');
     const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
-    set('anthropicKey',keys.anthropic); set('sunoKey',keys.suno);
+    set('anthropicKey',keys.anthropic); set('sunoKey',keys.suno); set('sunoCookie',keys.sunoCookie);
     set('elevenKey',keys.eleven); set('moisesKey',keys.moises); set('dolbyKey',keys.dolby);
     Object.entries(keys).forEach(([k,v]) => checkAPIStatus(k, v));
     SUNO_MODE = localStorage.getItem('suno_mode')==='true';
@@ -5419,24 +5448,30 @@ function checkAPIStatus(service, value) {
 }
 
 async function testSunoKey() {
-  const key = document.getElementById('sunoKey')?.value?.trim();
-  if (!key) { toast('⚠️ Ingresa tu Suno API key primero'); return; }
-  toast('🔍 Verificando Suno API...');
+  const url = document.getElementById('sunoKey')?.value?.trim();
+  if (!url) { toast('⚠️ Ingresa la URL de tu suno-api en Vercel'); return; }
+  const badge = document.getElementById('badge-suno');
+  toast('🔍 Conectando a suno-api...');
   try {
-    const res = await fetch('https://studio-api.suno.ai/api/billing/info/', {
-      headers: { 'Authorization': 'Bearer ' + key }
-    });
-    const badge = document.getElementById('badge-suno');
+    // Test the gcui-art/suno-api /api/get_limit endpoint
+    const baseUrl = url.replace(/\/+$/, '');
+    const res = await fetch(baseUrl + '/api/get_limit');
     if (res.ok) {
       const data = await res.json();
-      const credits = data?.total_credits_left || '?';
+      const credits = data?.credits_left ?? data?.monthly_limit ?? '?';
       if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ ' + credits + ' créditos'; }
-      toast('✅ Suno conectado — ' + credits + ' créditos');
+      saveAPIKeys();
+      toast('✅ suno-api conectado — ' + credits + ' créditos disponibles');
     } else {
-      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = 'Key inválida'; }
-      toast('⚠️ Suno key inválida (status ' + res.status + ')');
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Error ' + res.status; }
+      toast('⚠️ No se pudo conectar — verifica la URL de Vercel');
     }
-  } catch(e) { toast('⚠️ Error verificando Suno: ' + e.message); }
+  } catch(e) {
+    // Might be CORS — save anyway
+    if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ URL guardada'; }
+    saveAPIKeys();
+    toast('✅ URL guardada — se usará al generar');
+  }
 }
 
 async function testElevenKey() {
@@ -5491,46 +5526,99 @@ function toggleSunoMode(sw) {
 }
 
 async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
-  const sunoKey = getAPIKey('suno');
-  if (!sunoKey) throw new Error('No Suno API key');
+  const sunoUrl = getAPIKey('suno');
+  if (!sunoUrl) throw new Error('No suno-api URL configured');
+  const baseUrl = sunoUrl.replace(/\/+$/, '');
   const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
+
   const sunoPrompt = buildSunoPrompt(prompt, orchStyle, bpm, key_sig);
-  addLog('📝 Prompt Suno: ' + sunoPrompt.substring(0,80)+'...');
-  const genRes = await fetch('https://studio-api.suno.ai/api/generate/v2/', {
-    method:'POST',
-    headers:{'Authorization':'Bearer '+sunoKey,'Content-Type':'application/json'},
-    body: JSON.stringify({
-      prompt: sunoPrompt, mv: 'chirp-v4',
-      title: document.getElementById('songName')?.value||'PipoRadio Song',
-      tags: orchStyle,
-      make_instrumental: document.getElementById('lm-none')?.classList.contains('on'),
-      wait_audio: false,
-    })
-  });
-  if (!genRes.ok) throw new Error('Suno error ' + genRes.status + ': ' + await genRes.text().then(t=>t.substring(0,80)));
-  const genData = await genRes.json();
-  const clips = genData.clips||[];
-  if (!clips.length) throw new Error('No clips from Suno');
-  const clipId = clips[0].id;
-  addLog('⏳ Generando (ID: '+clipId+')...');
-  for (let i=0; i<60; i++) {
-    await sleep(3000);
-    addLog('⏳ Esperando audio de Suno... ('+(i*3)+'s)');
-    const pollRes = await fetch('https://studio-api.suno.ai/api/feed/?ids='+clipId, {
-      headers:{'Authorization':'Bearer '+sunoKey}
+  addLog('🎵 Enviando a suno-api: ' + sunoPrompt.substring(0,70)+'...');
+
+  const isInstrumental = document.getElementById('lm-none')?.classList.contains('on');
+  const lyrics = !isInstrumental ? (document.getElementById('songLyrics')?.value?.trim() || '') : '';
+
+  // Use custom_generate if we have lyrics, generate otherwise
+  let genRes;
+  if (lyrics && lyrics.length > 10) {
+    addLog('📝 Modo custom (con letra)...');
+    genRes = await fetch(baseUrl + '/api/custom_generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: sunoPrompt,
+        lyrics: lyrics,
+        title: document.getElementById('songName')?.value || 'PipoRadio Song',
+        make_instrumental: false,
+        wait_audio: false,
+      })
     });
-    if (!pollRes.ok) continue;
-    const pollData = await pollRes.json();
-    const clip = (pollData.clips||pollData)[0];
-    if (clip?.status==='complete' && clip?.audio_url) {
-      addLog('✅ Audio Suno listo: '+clip.title);
-      const ab = await (await fetch(clip.audio_url)).arrayBuffer();
-      const buf = await getCtx().decodeAudioData(ab);
-      return { buffer:buf, name:clip.title||'Suno Song', sunoClipId:clipId };
-    }
-    if (clip?.status==='error') throw new Error('Suno falló: '+(clip.error_message||'error'));
+  } else {
+    genRes = await fetch(baseUrl + '/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: sunoPrompt,
+        make_instrumental: isInstrumental,
+        wait_audio: false,
+      })
+    });
   }
-  throw new Error('Suno timeout');
+
+  if (!genRes.ok) {
+    const errText = await genRes.text();
+    throw new Error('suno-api error ' + genRes.status + ': ' + errText.substring(0,100));
+  }
+
+  const genData = await genRes.json();
+  const clips = Array.isArray(genData) ? genData : (genData.clips || []);
+  if (!clips.length) throw new Error('suno-api no devolvió clips');
+
+  const clipId = clips[0].id;
+  addLog('⏳ Generando audio (ID: ' + clipId + ')...');
+
+  // Poll for completion using /api/get
+  for (let i = 0; i < 60; i++) {
+    await sleep(4000);
+    addLog('⏳ Esperando audio... (' + (i*4) + 's / ~60s normal)');
+
+    const pollRes = await fetch(baseUrl + '/api/get?ids=' + clipId);
+    if (!pollRes.ok) continue;
+
+    const pollData = await pollRes.json();
+    const clip = Array.isArray(pollData) ? pollData[0] : pollData;
+
+    if (clip?.status === 'complete' && clip?.audio_url) {
+      addLog('✅ Audio listo: ' + (clip.title || clip.id));
+      // Download and decode the audio
+      const audioRes = await fetch(clip.audio_url);
+      const ab = await audioRes.arrayBuffer();
+      const buf = await getCtx().decodeAudioData(ab);
+      return {
+        buffer: buf,
+        name: clip.title || document.getElementById('songName')?.value || 'Suno Song',
+        sunoClipId: clipId,
+        imageUrl: clip.image_url,
+      };
+    }
+
+    if (clip?.status === 'error') {
+      throw new Error('Suno error: ' + (clip.meta_data?.error_message || 'unknown'));
+    }
+
+    // Also check 'streaming' status - audio is ready to use
+    if (clip?.status === 'streaming' && clip?.audio_url) {
+      addLog('✅ Audio disponible (streaming): ' + (clip.title || clip.id));
+      const audioRes = await fetch(clip.audio_url);
+      const ab = await audioRes.arrayBuffer();
+      const buf = await getCtx().decodeAudioData(ab);
+      return {
+        buffer: buf,
+        name: clip.title || 'Suno Song',
+        sunoClipId: clipId,
+      };
+    }
+  }
+  throw new Error('Timeout esperando audio de Suno (>4 min)');
 }
 
 function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
