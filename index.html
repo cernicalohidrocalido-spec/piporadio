@@ -1476,8 +1476,12 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
         Genera letras contextualizadas al género, mood e instrumentación detectada.
         <a href="https://console.anthropic.com/" target="_blank">Obtener API key →</a>
       </div>
-      <div class="ig"><div class="lbl">Anthropic API Key</div>
-        <input class="inp" id="anthropicKey" type="password" placeholder="sk-ant-..." oninput="checkAPIStatus('anthropic',this.value)">
+      <div class="ig">
+        <div class="lbl">Anthropic API Key</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="anthropicKey" type="password" placeholder="sk-ant-..." style="flex:1" oninput="checkAPIStatus('anthropic',this.value)">
+          <button class="btn btn-green" onclick="testAnthropicKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
+        </div>
       </div>
     </div>
 
@@ -1495,6 +1499,78 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
         <div style="font-size:11px;color:var(--txt2);margin-bottom:10px;line-height:1.6">Masterización automática con calidad broadcast.</div>
         <div class="ig"><div class="lbl">App Key</div>
           <input class="inp" id="dolbyKey" type="password" placeholder="...">
+        </div>
+      </div>
+    </div>
+
+    <!-- CORS PROXY — Cloudflare Worker -->
+    <div class="card" style="margin-bottom:14px;border-color:rgba(6,182,212,.25)">
+      <div class="card-title"><i class="fas fa-shield-halved" style="color:var(--nc)"></i> Proxy CORS — Necesario para GitHub Pages
+        <span style="margin-left:auto;padding:2px 8px;border-radius:99px;font-size:9px;background:rgba(239,68,68,.15);color:#ef4444;font-weight:700">REQUERIDO</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--txt2);line-height:1.8;margin-bottom:12px;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);border-radius:var(--rs);padding:10px">
+        GitHub Pages bloquea las llamadas directas a APIs externas (CORS).<br>
+        Despliega un <strong style="color:var(--nc)">Cloudflare Worker gratuito</strong> en 2 minutos para solucionar esto:
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px;margin-bottom:12px">
+        <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--nc);margin-bottom:8px">Pasos para desplegar el proxy (gratis)</div>
+        <div style="font-size:11.5px;color:var(--txt2);line-height:1.9">
+          1. Ve a <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--nc)">workers.cloudflare.com</a> → crear cuenta gratis<br>
+          2. Clic en <strong style="color:var(--txt)">Create Worker</strong><br>
+          3. Borra todo el código y pega el código de abajo<br>
+          4. Clic en <strong style="color:var(--txt)">Deploy</strong><br>
+          5. Copia la URL que te da (ej: <code style="color:var(--nc)">https://piporadio-proxy.TU-USUARIO.workers.dev</code>)<br>
+          6. Pégala aquí abajo
+        </div>
+      </div>
+      <div style="background:var(--bg0);border-radius:var(--rs);padding:12px;margin-bottom:12px;font-family:var(--fm);font-size:11px;line-height:1.9;border:1px solid var(--border)">
+        <div style="color:var(--nc);font-size:9px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-family:var(--fb)">📋 Código del Worker — copia y pega en Cloudflare</div>
+        <div id="workerCode" style="color:var(--txt2);white-space:pre-wrap;user-select:all;cursor:text">export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const target = url.searchParams.get('target') || 
+                   url.pathname.replace('/proxy/', '');
+    const apiUrl = 'https://udioapi.pro' + url.pathname + url.search;
+    
+    const headers = new Headers(request.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
+    
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+      }});
+    }
+    
+    const res = await fetch(apiUrl, {
+      method: request.method,
+      headers: { 
+        'Authorization': request.headers.get('Authorization') || '',
+        'Content-Type': 'application/json',
+      },
+      body: request.method !== 'GET' ? request.body : undefined,
+    });
+    
+    const data = await res.text();
+    return new Response(data, {
+      status: res.status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
+  }
+};</div>
+        <button class="btn" style="margin-top:8px;font-size:11px;width:100%;justify-content:center" onclick="copyWorkerCode()">
+          <i class="fas fa-copy"></i> Copiar código del Worker
+        </button>
+      </div>
+      <div class="ig" style="margin-bottom:0">
+        <div class="lbl">URL de tu Cloudflare Worker</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="proxyUrl" type="text" placeholder="https://piporadio-proxy.tu-usuario.workers.dev" style="flex:1;font-family:var(--fm);font-size:12px" oninput="saveProxyUrl(this.value)">
+          <button class="btn btn-green" onclick="testProxy()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
         </div>
       </div>
     </div>
@@ -4888,7 +4964,12 @@ async function buildAutoPromptAI() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mejorando...'; }
   
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const isVercel5 = window.location.hostname.includes('vercel.app');
+    const customProxy5 = localStorage.getItem('pr_proxy') || '';
+    const lyricsUrl = customProxy5 ? customProxy5.replace(/\/+$/, '') + '/v1/messages'
+                    : isVercel5 ? '/api/proxy?service=anthropic&path=%2Fv1%2Fmessages'
+                    : 'https://api.anthropic.com/v1/messages';
+    const res = await fetch(lyricsUrl, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'x-api-key': key, 'anthropic-version':'2023-06-01' },
       body: JSON.stringify({
@@ -5239,7 +5320,12 @@ async function testSunoKey() {
   const badge = document.getElementById('badge-suno');
   toast('🔍 Verificando udioapi.pro...');
   try {
-    const res = await fetch('https://udioapi.pro/api/query-credits', {
+    const isVercel3 = window.location.hostname.includes('vercel.app');
+    const customProxy3 = localStorage.getItem('pr_proxy') || '';
+    const credUrl = customProxy3 ? customProxy3.replace(/\/+$/, '') + '/api/query-credits'
+                  : isVercel3 ? '/api/proxy?service=udio&path=' + encodeURIComponent('/api/query-credits')
+                  : 'https://udioapi.pro/api/query-credits';
+    const res = await fetch(credUrl, {
       headers: { 'Authorization': 'Bearer ' + key }
     });
     if (res.ok) {
@@ -5313,6 +5399,50 @@ async function testElevenKey() {
   }
 }
 
+async function testAnthropicKey() {
+  const key = document.getElementById('anthropicKey')?.value?.trim();
+  if (!key) { toast('⚠️ Ingresa tu Anthropic API key primero'); return; }
+  const badge = document.getElementById('badge-anthropic');
+  toast('🔍 Verificando Claude API...');
+  try {
+    const isVercel4 = window.location.hostname.includes('vercel.app');
+    const customProxy4 = localStorage.getItem('pr_proxy') || '';
+    const anthropicUrl = customProxy4 ? customProxy4.replace(/\/+$/, '') + '/v1/messages'
+                       : isVercel4 ? '/api/proxy?service=anthropic&path=%2Fv1%2Fmessages'
+                       : 'https://api.anthropic.com/v1/messages';
+    const res = await fetch(anthropicUrl, {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'ok' }]
+      })
+    });
+    if (res.ok) {
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Conectado'; }
+      saveAPIKeys();
+      toast('✅ Claude API conectada — generación de letras activada');
+    } else if (res.status === 401) {
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Key inválida'; }
+      toast('⚠️ API key incorrecta — verifica en console.anthropic.com');
+    } else {
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Key guardada'; }
+      saveAPIKeys();
+      toast('✅ Key guardada correctamente');
+    }
+  } catch(e) {
+    // CORS might block — save anyway
+    if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Key guardada'; }
+    saveAPIKeys();
+    toast('✅ Key guardada — se verificará al generar letras');
+  }
+}
+
 let SUNO_MODE = localStorage.getItem('suno_mode') === 'true';
 
 function toggleSunoMode(sw) {
@@ -5362,7 +5492,20 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
     addLog('💡 Modo inspiración — sin letra');
   }
 
-  const genRes = await fetch('https://udioapi.pro/api/v2/generate', {
+  // Route through CORS proxy
+  const proxyUrl = getAPIKey('proxy') || localStorage.getItem('pr_proxy') || '';
+  // Use /api/proxy when on Vercel (same domain, no CORS)
+  // Fall back to direct when running locally
+  const isVercel = window.location.hostname.includes('vercel.app');
+  const customProxy = localStorage.getItem('pr_proxy') || '';
+  
+  const buildUrl = (path) => {
+    if (customProxy) return customProxy.replace(/\/+$/, '') + path;
+    if (isVercel)    return '/api/proxy?service=udio&path=' + encodeURIComponent(path);
+    return 'https://udioapi.pro' + path;
+  };
+
+  const genRes = await fetch(buildUrl('/api/v2/generate'), {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + apiKey,
@@ -5389,7 +5532,15 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
 
     let pollRes;
     try {
-      pollRes = await fetch('https://udioapi.pro/api/v2/feed?taskId=' + taskId, {
+      const isVercel2 = window.location.hostname.includes('vercel.app');
+      const customProxy2 = localStorage.getItem('pr_proxy') || '';
+      const feedPath = '/api/v2/feed?taskId=' + taskId;
+      let feedUrl;
+      if (customProxy2) feedUrl = customProxy2.replace(/\/+$/, '') + feedPath;
+      else if (isVercel2) feedUrl = '/api/proxy?service=udio&path=' + encodeURIComponent(feedPath);
+      else feedUrl = 'https://udioapi.pro' + feedPath;
+      
+      pollRes = await fetch(feedUrl, {
         headers: { 'Authorization': 'Bearer ' + apiKey }
       });
     } catch(e) { continue; }
@@ -5521,6 +5672,59 @@ function installPWAManifest() {
   const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
   const link = document.getElementById('pwa-manifest');
   if (link) link.href = URL.createObjectURL(blob);
+}
+
+
+// ── PROXY / CORS HELPERS ──
+function saveProxyUrl(val) {
+  localStorage.setItem('pr_proxy', val.trim());
+}
+
+function copyWorkerCode() {
+  const el = document.getElementById('workerCode');
+  const text = el?.textContent || '';
+  navigator.clipboard?.writeText(text)
+    .then(() => toast('📋 Código copiado — pégalo en Cloudflare Workers'))
+    .catch(() => { 
+      const range = document.createRange();
+      range.selectNode(el);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      toast('📋 Código copiado');
+    });
+}
+
+async function testProxy() {
+  const url = document.getElementById('proxyUrl')?.value?.trim();
+  if (!url) { toast('⚠️ Ingresa la URL de tu Cloudflare Worker'); return; }
+  toast('🔍 Probando proxy...');
+  try {
+    const testUrl = url.replace(/\/+$/, '') + '/api/query-credits';
+    const apiKey = getAPIKey('suno');
+    const res = await fetch(testUrl, {
+      headers: apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {}
+    });
+    if (res.ok || res.status === 401) {
+      localStorage.setItem('pr_proxy', url.trim());
+      const badge = document.getElementById('badge-backend');
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Proxy activo'; }
+      toast('✅ Proxy funcionando — CORS resuelto');
+    } else {
+      toast('⚠️ Proxy responde con status ' + res.status + ' — verifica el Worker');
+    }
+  } catch(e) {
+    toast('⚠️ Proxy no accesible: ' + e.message);
+  }
+}
+
+// Load proxy URL on start
+function loadProxyUrl() {
+  const saved = localStorage.getItem('pr_proxy');
+  if (saved) {
+    const el = document.getElementById('proxyUrl');
+    if (el) el.value = saved;
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
