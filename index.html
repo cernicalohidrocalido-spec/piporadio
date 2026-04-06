@@ -1443,11 +1443,6 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
       </div>
     </div>
 
-        <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar Suno para generación (audio profesional real)</div>
-        <div class="sw" id="sw-suno" onclick="toggleSunoMode(this)"></div>
-      </div>
-    </div>
-
     <!-- ELEVENLABS — Clonación de voz real -->
     <div class="card" style="margin-bottom:14px;border-color:rgba(236,72,153,.2)">
       <div class="card-title"><i class="fas fa-microphone" style="color:var(--nf)"></i> ElevenLabs — Clonación de voz profesional</div>
@@ -3489,8 +3484,11 @@ async function genLyrics(){
   const usr=`Escribe letra completa para:\nGénero: ${genre}\nMood: ${mood}\nBPM: ${bpm}\nTonalidad: ${key}\nDescripción: ${prompt||'canción emotiva'}\n${existing?'Referencia:\n'+existing.slice(0,200):''}`;
 
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
+    const _anthUrl = (window.location.hostname.includes('vercel.app')||window.location.hostname.includes('github.io'))
+      ? '/api/proxy?service=anthropic&path=' + encodeURIComponent('/v1/messages')
+      : 'https://api.anthropic.com/v1/messages';
+    const res=await fetch(_anthUrl,{
+      method:'POST',headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:usr}]})
     });
     const data=await res.json();
@@ -4467,6 +4465,13 @@ async function generateSong() {
   const btn = document.getElementById('genBtn');
   if (btn && btn.disabled) return;
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...'; }
+  // Immediate toast so user knows something is happening
+  const _mode = (typeof SUNO_MODE !== 'undefined' && SUNO_MODE && getAPIKey('suno'))
+    ? '🎵 Generando con Suno IA...' : '🎹 Sintetizando localmente...';
+  toast(_mode);
+  // Clear previous log
+  const _log = document.getElementById('genLog');
+  if (_log) _log.innerHTML = '';
 
   const prompt   = document.getElementById('songPrompt')?.value?.trim() || '';
   const orchStyle= document.getElementById('orchStyle')?.value || 'pop';
@@ -4628,11 +4633,11 @@ async function generateSong() {
       toast('💳 Sin créditos en udioapi.pro — usando síntesis local');
       try {
         const ctx = getCtx();
-        const stemInst   = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'inst');
-        const stemAccomp  = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'accomp');
-        const stemDrums   = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'drums');
+        const stemInst   = await synthStem(ctx, Math.min(durVal,20), bpm, keyVal, orchStyle, 'inst');
+        const stemAccomp  = await synthStem(ctx, Math.min(durVal,20), bpm, keyVal, orchStyle, 'accomp');
+        const stemDrums   = await synthStem(ctx, Math.min(durVal,20), bpm, keyVal, orchStyle, 'drums');
         setStep(3); addLog('Mezclando...');
-        const mixedBuf = await mixStems({ inst:stemInst, accomp:stemAccomp, drums:stemDrums }, Math.min(durVal,45));
+        const mixedBuf = await mixStems({ inst:stemInst, accomp:stemAccomp, drums:stemDrums }, Math.min(durVal,20));
         setStep(4); setStep(5);
         const song = {
           id: Date.now(), name: nameVal || genName(),
@@ -4994,7 +4999,7 @@ async function buildAutoPromptAI() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mejorando...'; }
   
   try {
-    const isVercel5 = window.location.hostname.includes('vercel.app');
+    const isVercel5 = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io');
     const customProxy5 = localStorage.getItem('pr_proxy') || '';
     const lyricsUrl = customProxy5 ? customProxy5.replace(/\/+$/, '') + '/v1/messages'
                     : isVercel5 ? '/api/proxy?service=anthropic&path=%2Fv1%2Fmessages'
@@ -5352,8 +5357,8 @@ async function testSunoKey() {
   try {
     const isVercel3 = window.location.hostname.includes('vercel.app');
     const customProxy3 = localStorage.getItem('pr_proxy') || '';
-    const credUrl = customProxy3 ? customProxy3.replace(/\/+$/, '') + '/api/query-credits'
-                  : isVercel3 ? '/api/proxy?service=udio&path=' + encodeURIComponent('/api/query-credits')
+    const credUrl = customProxy3 ? customProxy3.replace(/\/+$/, '') + '/api/v2/query-credits'
+                  : isVercel3 ? '/api/proxy?service=udio&path=' + encodeURIComponent('/api/v2/query-credits')
                   : 'https://udioapi.pro/api/query-credits';
     const res = await fetch(credUrl, {
       headers: { 'Authorization': 'Bearer ' + key }
@@ -5435,7 +5440,7 @@ async function testAnthropicKey() {
   const badge = document.getElementById('badge-anthropic');
   toast('🔍 Verificando Claude API...');
   try {
-    const isVercel4 = window.location.hostname.includes('vercel.app');
+    const isVercel4 = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io');
     const customProxy4 = localStorage.getItem('pr_proxy') || '';
     const anthropicUrl = customProxy4 ? customProxy4.replace(/\/+$/, '') + '/v1/messages'
                        : isVercel4 ? '/api/proxy?service=anthropic&path=%2Fv1%2Fmessages'
@@ -5487,123 +5492,172 @@ function toggleSunoMode(sw) {
 
 async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
   const apiKey = getAPIKey('suno');
-  if (!apiKey) throw new Error('No udioapi.pro API key configurada');
+  if (!apiKey) throw new Error('No udioapi.pro API key configurada — ve a Ajustes & API');
 
-  const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
+  const addLog = msg => {
+    const l = document.getElementById('genLog');
+    if (l) { l.innerHTML += '> ' + msg + '<br>'; l.scrollTop = l.scrollHeight; }
+    console.log('[SUNO]', msg);
+  };
 
   const isInstrumental = document.getElementById('lm-none')?.classList.contains('on');
-  const lyrics = !isInstrumental ? (document.getElementById('songLyrics')?.value?.trim() || '') : '';
+  const lyrics   = !isInstrumental ? (document.getElementById('songLyrics')?.value?.trim() || '') : '';
   const songTitle = document.getElementById('songName')?.value?.trim() || 'PipoRadio Song';
-  const model = document.getElementById('sunoModel')?.value || 'chirp-v4-5';
+  const model    = document.getElementById('sunoModel')?.value || 'chirp-v4-5';
   const sunoStyle = buildSunoPrompt(prompt, orchStyle, bpm, key_sig);
 
-  const isVercel = window.location.hostname.includes('vercel.app');
-  const customProxy = localStorage.getItem('pr_proxy') || '';
+  // Build proxy URL
   const buildUrl = (path) => {
+    const customProxy = localStorage.getItem('pr_proxy') || '';
     if (customProxy) return customProxy.replace(/\/+$/, '') + path;
-    if (isVercel)    return '/api/proxy?service=udio&path=' + encodeURIComponent(path);
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io')) {
+      return '/api/proxy?service=udio&path=' + encodeURIComponent(path);
+    }
     return 'https://udioapi.pro' + path;
   };
 
-  addLog('🎵 Enviando a udioapi.pro [' + model + ']...');
-  addLog('🎼 ' + sunoStyle.substring(0,80) + '...');
+  // Helper: extract audio URL from any udioapi.pro response shape
+  const findAudio = (d) => {
+    if (!d) return null;
+    const sources = [d, d.data, d.result, d.output];
+    if (Array.isArray(d.data))  sources.push(...d.data);
+    if (Array.isArray(d.clips)) sources.push(...d.clips);
+    if (Array.isArray(d.songs)) sources.push(...d.songs);
+    if (Array.isArray(d))       sources.push(...d);
+    for (const c of sources) {
+      if (!c || typeof c !== 'object') continue;
+      const url = c.audio_url || c.audioUrl || c.url || c.output_url || c.mp3_url || c.song_url;
+      if (url && typeof url === 'string' && url.startsWith('http')) {
+        return { url, name: c.title || c.name || songTitle };
+      }
+    }
+    return null;
+  };
 
+  addLog('🎵 Conectando a udioapi.pro [' + model + ']...');
+  addLog('🎼 Estilo: ' + sunoStyle.substring(0, 80) + '...');
+
+  // Build request body
   const body = {
     model,
     make_instrumental: isInstrumental,
+    wait_audio: true,
     style_weight: 0.7,
     weirdness_constraint: 0.3,
     gender: 'male',
-    wait_audio: true,
   };
 
   if (lyrics && lyrics.length > 10) {
     body.prompt = lyrics.substring(0, 3000);
     body.style  = sunoStyle.substring(0, 500);
     body.title  = songTitle;
-    addLog('📝 Modo con letra');
+    addLog('📝 Modo con letra (' + lyrics.length + ' chars)');
   } else {
     body.gpt_description_prompt = sunoStyle.substring(0, 400);
-    body.title = songTitle;
-    addLog('💡 Modo inspiración — esperando respuesta (60-120s)...');
+    body.title  = songTitle;
+    addLog('💡 Modo inspiración — procesando (60-120s normales)...');
   }
 
-  const genRes = await fetch(buildUrl('/api/v2/generate'), {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  // ── ENVIAR A SUNO ──────────────────────────────────────────
+  addLog('📡 Enviando petición...');
+  let genData;
+  try {
+    const genRes = await fetch(buildUrl('/api/v2/generate'), {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-  if (!genRes.ok) {
-    const errText = await genRes.text();
-    if (genRes.status === 402) { addLog('⚠️ Sin créditos — recarga en udioapi.pro/pricing'); throw new Error('SIN_CREDITOS'); }
-    if (genRes.status === 401) throw new Error('API key inválida');
-    throw new Error('Error ' + genRes.status + ': ' + errText.substring(0,120));
-  }
+    const rawText = await genRes.text();
+    addLog('📥 Respuesta HTTP ' + genRes.status + ': ' + rawText.substring(0, 120));
 
-  const genData = await genRes.json();
-  addLog('📡 Respuesta: ' + JSON.stringify(genData).substring(0,150));
-
-  // Helper: extract audio from any response shape
-  const findAudio = (d) => {
-    if (!d) return null;
-    const candidates = [
-      d, d.data, ...(Array.isArray(d.data) ? d.data : []),
-      ...(Array.isArray(d.clips) ? d.clips : []),
-      ...(Array.isArray(d.songs) ? d.songs : []),
-    ];
-    for (const c of candidates) {
-      if (!c) continue;
-      const url = c.audio_url || c.audioUrl || c.url || c.output_url;
-      if (url && url.startsWith('http')) return { url, name: c.title || songTitle };
+    if (!genRes.ok) {
+      if (genRes.status === 402) throw new Error('SIN_CREDITOS');
+      if (genRes.status === 401) throw new Error('API key inválida — verifica en udioapi.pro/dashboard');
+      if (genRes.status === 404) throw new Error('Endpoint no encontrado — verifica la URL del proxy');
+      throw new Error('Error ' + genRes.status + ': ' + rawText.substring(0, 100));
     }
-    return null;
-  };
 
-  // wait_audio:true — audio should be in the response directly
+    try { genData = JSON.parse(rawText); }
+    catch(e) { throw new Error('Respuesta inválida: ' + rawText.substring(0, 80)); }
+
+  } catch(e) {
+    if (e.message === 'SIN_CREDITOS' || e.message.includes('API key') || e.message.includes('Endpoint')) throw e;
+    // Network error (CORS, offline, etc.)
+    addLog('⚠️ Error de red: ' + e.message);
+    throw new Error('Error de conexión: ' + e.message + '. Verifica que api/proxy.js esté desplegado en Vercel.');
+  }
+
+  // ── INTENTAR AUDIO DIRECTO (wait_audio=true) ───────────────
   const direct = findAudio(genData);
   if (direct) {
-    addLog('✅ Audio listo: ' + direct.name);
-    addLog('📥 Descargando...');
-    const ab = await (await fetch(direct.url)).arrayBuffer();
-    return { buffer: await getCtx().decodeAudioData(ab), name: direct.name };
+    addLog('✅ Audio recibido directamente: ' + direct.name);
+    return await downloadAndDecode(direct.url, direct.name);
   }
 
-  // Fallback: poll with workId
-  const workId = genData?.workId || genData?.data?.task_id || genData?.taskId;
-  if (!workId) throw new Error('Sin audio ni workId en respuesta');
+  // ── POLLING con workId ─────────────────────────────────────
+  const workId = genData?.workId || genData?.work_id || genData?.taskId || genData?.task_id
+               || genData?.id    || genData?.data?.workId || genData?.data?.task_id;
 
-  addLog('⏳ Polling workId: ' + workId + ' ...');
+  if (!workId) {
+    addLog('⚠️ Respuesta completa: ' + JSON.stringify(genData).substring(0, 300));
+    throw new Error('Sin workId en respuesta — formato inesperado de udioapi.pro');
+  }
 
-  for (let i = 0; i < 60; i++) {
-    await sleep(5000);
-    if (i % 3 === 0) addLog('⏳ ' + (i*5) + 's...');
+  addLog('⏳ Polling workId: ' + workId);
+
+  const MAX_POLLS = 80;   // 80 × 6s = 8 minutos
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(r => setTimeout(r, 6000));
+    const elapsed = ((i + 1) * 6);
+    if (i % 5 === 0) addLog('⏳ ' + elapsed + 's... generando audio en Suno');
 
     try {
-      const feedPath = '/api/v2/feed?workId=' + workId;
-      const feedUrl = customProxy ? customProxy.replace(/\/+$/, '') + feedPath
-                    : isVercel   ? '/api/proxy?service=udio&path=' + encodeURIComponent(feedPath)
-                    : 'https://udioapi.pro' + feedPath;
-      const pr = await fetch(feedUrl, { headers: { 'Authorization': 'Bearer ' + apiKey } });
-      if (!pr.ok) continue;
+      const feedUrl = buildUrl('/api/v2/feed?workId=' + workId);
+      const pr = await fetch(feedUrl, {
+        headers: { 'Authorization': 'Bearer ' + apiKey }
+      });
+      if (!pr.ok) { addLog('Feed HTTP ' + pr.status + ' — reintentando...'); continue; }
+
       const pd = await pr.json();
-      if (i % 3 === 0) addLog('📡 Feed: ' + JSON.stringify(pd).substring(0,100));
+      if (i % 5 === 0) addLog('Feed: ' + JSON.stringify(pd).substring(0, 100));
+
       const found = findAudio(pd);
       if (found) {
-        addLog('✅ ' + found.name);
-        const ab = await (await fetch(found.url)).arrayBuffer();
-        return { buffer: await getCtx().decodeAudioData(ab), name: found.name, workId };
+        addLog('✅ Audio listo: ' + found.name + ' (' + elapsed + 's)');
+        return await downloadAndDecode(found.url, found.name);
       }
-      const st = pd?.status || pd?.data?.[0]?.status || '';
-      if (st === 'error' || st === 'FAILED') throw new Error('Generación falló en servidor');
-    } catch(e) {
-      if (e.message.includes('falló')) throw e;
-      continue;
+
+      const st = pd?.status || pd?.data?.[0]?.status || pd?.state || '';
+      if (st === 'error' || st === 'FAILED' || st === 'failed') {
+        throw new Error('Suno reportó error en la generación');
+      }
+    } catch(pollErr) {
+      if (pollErr.message.includes('reportó error')) throw pollErr;
+      // Continue polling on transient errors
     }
   }
-  throw new Error('Timeout — Suno está ocupado. Intenta de nuevo.');
+
+  throw new Error('Timeout — Suno está muy ocupado. Intenta de nuevo en unos minutos.');
 }
 
+async function downloadAndDecode(url, name) {
+  const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
+  addLog('📥 Descargando audio: ' + url.substring(0, 60) + '...');
+  try {
+    const ab = await (await fetch(url)).arrayBuffer();
+    addLog('🔊 Decodificando audio (' + Math.round(ab.byteLength/1024) + ' KB)...');
+    const buffer = await getCtx().decodeAudioData(ab);
+    addLog('✅ Decodificado: ' + Math.round(buffer.duration) + 's · ' + buffer.numberOfChannels + 'ch');
+    return { buffer, name, sunoClipId: null };
+  } catch(e) {
+    addLog('⚠️ Error descargando: ' + e.message + ' — URL: ' + url.substring(0,80));
+    throw new Error('No se pudo descargar el audio: ' + e.message);
+  }
+}
 
 function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
   // Ultra-precise style descriptions for udioapi.pro / Suno V4.5+
@@ -5727,7 +5781,7 @@ async function testProxy() {
   if (!url) { toast('⚠️ Ingresa la URL de tu Cloudflare Worker'); return; }
   toast('🔍 Probando proxy...');
   try {
-    const testUrl = url.replace(/\/+$/, '') + '/api/query-credits';
+    const testUrl = url.replace(/\/+$/, '') + '/api/v2/query-credits';
     const apiKey = getAPIKey('suno');
     const res = await fetch(testUrl, {
       headers: apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {}
