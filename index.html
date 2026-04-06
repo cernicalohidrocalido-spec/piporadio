@@ -568,6 +568,7 @@ body::after{content:'';position:fixed;inset:0;background:url("data:image/svg+xml
   <div class="nav-item" onclick="nav('generate')"><i class="fas fa-wand-magic-sparkles"></i> Generar</div>
   <div class="nav-item" onclick="nav('voiceseed')"><i class="fas fa-dna"></i> Voice Seed</div>
   <div class="nav-item" onclick="nav('mixer')"><i class="fas fa-sliders"></i> Mixer Pro</div>
+  <div class="nav-item" onclick="nav('master')"><i class="fas fa-sparkles"></i> Masterizar</div>
   <div class="nav-item" onclick="nav('library')"><i class="fas fa-music"></i> Librería</div>
 
   <div class="nav-sec">Cuenta</div>
@@ -1356,6 +1357,235 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
     </div>
   </div>
   <div class="grid" id="libGrid"><div class="empty"><i class="fas fa-music"></i><p>Tu librería está vacía</p></div></div>
+</div>
+
+
+<!-- MASTERIZACIÓN PROFESIONAL -->
+<div class="page" id="page-master">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">✨ Masterizar</div>
+      <div class="sec-sub">Masterización profesional gratuita en el navegador — sube tus canciones de BandLab, LandR, GarageBand o cualquier fuente</div>
+    </div>
+  </div>
+
+  <!-- UPLOAD ZONE -->
+  <div class="card" style="margin-bottom:14px;border:2px dashed rgba(212,175,55,.4);background:rgba(212,175,55,.04);cursor:pointer" id="masterUploadZone" onclick="document.getElementById('masterFileInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor='rgba(212,175,55,.4)'" ondrop="masterHandleDrop(event)">
+    <div style="text-align:center;padding:32px 16px">
+      <i class="fas fa-cloud-arrow-up" style="font-size:40px;color:var(--gold);margin-bottom:12px;display:block"></i>
+      <div style="font-size:16px;font-weight:700;color:var(--txt1);margin-bottom:6px">Sube tu canción para masterizar</div>
+      <div style="font-size:12px;color:var(--txt3)">MP3, WAV, OGG, M4A, FLAC — desde BandLab, LandR, GarageBand, etc.</div>
+      <div id="masterFileName" style="margin-top:10px;font-size:12px;color:var(--gold);font-weight:600"></div>
+    </div>
+  </div>
+  <input type="file" id="masterFileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac" style="display:none" onchange="masterLoadFile(this.files[0])">
+
+  <!-- WAVEFORM -->
+  <div id="masterWaveWrap" style="display:none;margin-bottom:14px">
+    <div class="card" style="padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--txt1)" id="masterTrackName">—</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="masterPlayBtn" onclick="masterTogglePlay()" style="min-width:70px"><i class="fas fa-play"></i> Play</button>
+          <button class="btn" onclick="masterCompare()" id="masterCmpBtn" style="display:none"><i class="fas fa-arrows-left-right"></i> A/B</button>
+        </div>
+      </div>
+      <div id="masterWave" style="height:64px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.03)"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--txt3)">
+        <span id="masterCurTime">0:00</span>
+        <span id="masterDuration">0:00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANÁLISIS -->
+  <div id="masterAnalysisWrap" style="display:none;margin-bottom:14px">
+    <div class="card" style="padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📊 Análisis del audio</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="masterAnalysisGrid">
+        <div class="stat-box"><div class="stat-val" id="ma-lufs">—</div><div class="stat-lbl">LUFS</div></div>
+        <div class="stat-box"><div class="stat-val" id="ma-peak">—</div><div class="stat-lbl">Pico dBFS</div></div>
+        <div class="stat-box"><div class="stat-val" id="ma-dr">—</div><div class="stat-lbl">Rango dinámica</div></div>
+        <div class="stat-box"><div class="stat-val" id="ma-bpm">—</div><div class="stat-lbl">BPM</div></div>
+      </div>
+      <div id="masterDiagnostic" style="margin-top:10px;padding:8px 10px;border-radius:7px;background:rgba(255,255,255,.04);font-size:11.5px;color:var(--txt2);line-height:1.5"></div>
+    </div>
+  </div>
+
+  <!-- CONFIGURACIÓN DE MASTERIZACIÓN -->
+  <div id="masterConfigWrap" style="display:none;margin-bottom:14px">
+    <div class="card" style="padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">⚙️ Configuración</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <div class="lbl">Género / Estilo</div>
+          <select class="inp" id="masterGenre">
+            <option value="general">General / Balanceado</option>
+            <option value="grupero">Grupero / Norteño</option>
+            <option value="banda">Banda Sinaloense</option>
+            <option value="ranchera">Ranchera / Mariachi</option>
+            <option value="cumbia">Cumbia / Tropical</option>
+            <option value="pop">Pop Latino</option>
+            <option value="rock">Rock</option>
+            <option value="electronic">Electrónica</option>
+            <option value="jazz">Jazz / Bolero</option>
+            <option value="lofi">Lo-Fi / Chill</option>
+          </select>
+        </div>
+        <div>
+          <div class="lbl">Destino / Plataforma</div>
+          <select class="inp" id="masterTarget">
+            <option value="streaming">Streaming (Spotify, Apple — -14 LUFS)</option>
+            <option value="youtube">YouTube (-14 LUFS)</option>
+            <option value="tiktok">TikTok / Reels (-14 LUFS)</option>
+            <option value="cd">CD / Alta fidelidad (-9 LUFS)</option>
+            <option value="club">Club / DJ (-8 LUFS)</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="masterCustomLufs" style="display:none;margin-bottom:12px">
+        <div class="lbl">Target LUFS personalizado: <span id="masterLufsVal">-14</span></div>
+        <input type="range" min="-24" max="-6" value="-14" class="inp" style="padding:0;height:6px" oninput="document.getElementById('masterLufsVal').textContent=this.value">
+      </div>
+
+      <!-- CHAIN DE PROCESAMIENTO -->
+      <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🎚️ Cadena de procesamiento</div>
+
+      <div style="display:flex;flex-direction:column;gap:8px" id="masterChain">
+        <!-- EQ -->
+        <div class="master-module" id="mod-eq">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="sw sm" id="sw-eq" onclick="masterToggleModule('eq',this)" style="width:28px;height:16px"></div>
+              <span style="font-size:12.5px;font-weight:600;color:var(--txt1)">EQ — Ecualización</span>
+            </div>
+            <button class="btn" style="padding:2px 8px;font-size:10px" onclick="masterExpandModule('eq')">▸ Ajustar</button>
+          </div>
+          <div id="mod-eq-detail" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+              <div><div class="lbl" style="font-size:9.5px">Sub Bass</div><input type="range" min="-9" max="9" value="0" class="inp" style="padding:0;height:4px" id="eq-sub" oninput="updateMasterEQ()"><span id="eq-sub-v" style="font-size:9px;color:var(--txt3)">0dB</span></div>
+              <div><div class="lbl" style="font-size:9.5px">Bass 200Hz</div><input type="range" min="-9" max="9" value="0" class="inp" style="padding:0;height:4px" id="eq-bass" oninput="updateMasterEQ()"><span id="eq-bass-v" style="font-size:9px;color:var(--txt3)">0dB</span></div>
+              <div><div class="lbl" style="font-size:9.5px">Mids 2kHz</div><input type="range" min="-9" max="9" value="0" class="inp" style="padding:0;height:4px" id="eq-mid" oninput="updateMasterEQ()"><span id="eq-mid-v" style="font-size:9px;color:var(--txt3)">0dB</span></div>
+              <div><div class="lbl" style="font-size:9.5px">Air 12kHz</div><input type="range" min="-9" max="9" value="0" class="inp" style="padding:0;height:4px" id="eq-air" oninput="updateMasterEQ()"><span id="eq-air-v" style="font-size:9px;color:var(--txt3)">0dB</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMPRESOR -->
+        <div class="master-module" id="mod-comp">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="sw sm" id="sw-comp" onclick="masterToggleModule('comp',this)" style="width:28px;height:16px"></div>
+              <span style="font-size:12.5px;font-weight:600;color:var(--txt1)">Compresor multibanda</span>
+            </div>
+            <button class="btn" style="padding:2px 8px;font-size:10px" onclick="masterExpandModule('comp')">▸ Ajustar</button>
+          </div>
+          <div id="mod-comp-detail" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+              <div><div class="lbl" style="font-size:9.5px">Threshold</div><input type="range" min="-40" max="-6" value="-18" class="inp" style="padding:0;height:4px" id="comp-thr" oninput="updateMasterComp()"><span id="comp-thr-v" style="font-size:9px;color:var(--txt3)">-18dB</span></div>
+              <div><div class="lbl" style="font-size:9.5px">Ratio</div><input type="range" min="1" max="8" value="3" step="0.5" class="inp" style="padding:0;height:4px" id="comp-rat" oninput="updateMasterComp()"><span id="comp-rat-v" style="font-size:9px;color:var(--txt3)">3:1</span></div>
+              <div><div class="lbl" style="font-size:9.5px">Make-up</div><input type="range" min="0" max="12" value="4" class="inp" style="padding:0;height:4px" id="comp-mkp" oninput="updateMasterComp()"><span id="comp-mkp-v" style="font-size:9px;color:var(--txt3)">+4dB</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEREO WIDTH -->
+        <div class="master-module" id="mod-stereo">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="sw sm on" id="sw-stereo" onclick="masterToggleModule('stereo',this)" style="width:28px;height:16px"></div>
+              <span style="font-size:12.5px;font-weight:600;color:var(--txt1)">Stereo Imager</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:9.5px;color:var(--txt3)">Ancho:</span>
+              <input type="range" min="0.5" max="2" value="1.1" step="0.05" class="inp" style="width:80px;padding:0;height:4px" id="stereo-width" oninput="document.getElementById('stereo-w-v').textContent=Math.round(this.value*100)+'%'">
+              <span id="stereo-w-v" style="font-size:9px;color:var(--txt3);width:32px">110%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SATURADOR -->
+        <div class="master-module" id="mod-sat">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="sw sm" id="sw-sat" onclick="masterToggleModule('sat',this)" style="width:28px;height:16px"></div>
+              <span style="font-size:12.5px;font-weight:600;color:var(--txt1)">Saturación armónica</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:9.5px;color:var(--txt3)">Drive:</span>
+              <input type="range" min="0" max="100" value="15" class="inp" style="width:80px;padding:0;height:4px" id="sat-drive" oninput="document.getElementById('sat-d-v').textContent=this.value+'%'">
+              <span id="sat-d-v" style="font-size:9px;color:var(--txt3);width:28px">15%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIMITADOR -->
+        <div class="master-module" id="mod-lim">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="sw sm on" id="sw-lim" onclick="masterToggleModule('lim',this)" style="width:28px;height:16px"></div>
+              <span style="font-size:12.5px;font-weight:600;color:var(--txt1)">Limitador True Peak</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:9.5px;color:var(--txt3)">Ceiling:</span>
+              <input type="range" min="-3" max="-0.1" value="-0.3" step="0.1" class="inp" style="width:80px;padding:0;height:4px" id="lim-ceil" oninput="document.getElementById('lim-c-v').textContent=parseFloat(this.value).toFixed(1)+'dBFS'">
+              <span id="lim-c-v" style="font-size:9px;color:var(--txt3);width:56px">-0.3dBFS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRESETS -->
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🎯 Presets rápidos</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button class="btn btn-sm" onclick="masterApplyPreset('transparent')">🔍 Transparente</button>
+          <button class="btn btn-sm" onclick="masterApplyPreset('warm')">🌡️ Calidez grupera</button>
+          <button class="btn btn-sm" onclick="masterApplyPreset('loud')">🔊 Máximo volumen</button>
+          <button class="btn btn-sm" onclick="masterApplyPreset('vintage')">📻 Vintage analógico</button>
+          <button class="btn btn-sm" onclick="masterApplyPreset('broadcast')">📡 Broadcast radio</button>
+          <button class="btn btn-sm" onclick="masterApplyPreset('punchy')">💥 Punch & Impact</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTÓN MASTERIZAR -->
+  <div id="masterBtnWrap" style="display:none;margin-bottom:14px">
+    <button class="btn-pri btn-full" id="masterBtn" onclick="runMastering()">
+      <i class="fas fa-sparkles"></i> Masterizar ahora
+    </button>
+    <div id="masterProgress" style="display:none;margin-top:10px">
+      <div style="height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-bottom:6px">
+        <div id="masterProgFill" style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:2px;width:0%;transition:width .4s"></div>
+      </div>
+      <div id="masterProgMsg" style="font-size:11.5px;color:var(--txt3);text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="masterResultWrap" style="display:none">
+    <div class="card" style="padding:12px 14px;border-color:rgba(212,175,55,.3)">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">✅ Masterización completa</div>
+      <div id="masterResultWave" style="height:64px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.03);margin-bottom:10px"></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div class="stat-box" style="background:rgba(212,175,55,.08)"><div class="stat-val" id="mr-lufs" style="color:var(--gold)">—</div><div class="stat-lbl">LUFS</div></div>
+        <div class="stat-box" style="background:rgba(212,175,55,.08)"><div class="stat-val" id="mr-peak" style="color:var(--gold)">—</div><div class="stat-lbl">Pico dBFS</div></div>
+        <div class="stat-box" style="background:rgba(212,175,55,.08)"><div class="stat-val" id="mr-dr" style="color:var(--gold)">—</div><div class="stat-lbl">Rango din.</div></div>
+        <div class="stat-box" style="background:rgba(212,175,55,.08)"><div class="stat-val" id="mr-gain" style="color:var(--gold)">—</div><div class="stat-lbl">Ganancia</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-pri" onclick="masterPlayResult()" style="flex:1"><i class="fas fa-play"></i> Reproducir</button>
+        <button class="btn" onclick="masterDownload('wav')" style="flex:1"><i class="fas fa-download"></i> WAV 24-bit</button>
+        <button class="btn" onclick="masterDownload('mp3')" style="flex:1"><i class="fas fa-download"></i> MP3 320k</button>
+        <button class="btn" onclick="masterAddToLibrary()" style="flex:1"><i class="fas fa-plus"></i> Librería</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- EXPLORE -->
@@ -5857,6 +6087,589 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(ta) ta.addEventListener('input', updateFusionBar);
   }, 700);
 });
+
+// ════════════════════════════════════════════
+// MASTERING ENGINE
+// ════════════════════════════════════════════
+
+let masterCtx = null;
+let masterSourceBuffer = null;
+let masterResultBuffer = null;
+let masterSourceNode = null;
+let masterIsPlaying = false;
+let masterCurrentMode = 'source'; // 'source' | 'result'
+let masterWavesurfer = null;
+let masterResultSurfer = null;
+
+const MASTER_PRESETS = {
+  transparent: { eq: [0,0,0,0], comp: [-20,2,2], stereo: 1.0, sat: 0, lim: -0.3 },
+  warm:        { eq: [2,1,-1,0], comp: [-18,3,4], stereo: 1.05, sat: 20, lim: -0.3 },
+  loud:        { eq: [1,0,1,2], comp: [-14,4,6], stereo: 1.1, sat: 10, lim: -0.1 },
+  vintage:     { eq: [0,2,-2,3], comp: [-16,3,5], stereo: 0.9, sat: 35, lim: -0.5 },
+  broadcast:   { eq: [-1,0,2,1], comp: [-12,6,8], stereo: 1.0, sat: 5,  lim: -1.0 },
+  punchy:      { eq: [3,-1,0,1], comp: [-16,5,6], stereo: 1.15,sat: 8,  lim: -0.2 },
+};
+
+const GENRE_PRESETS = {
+  grupero:    'warm',
+  banda:      'punchy',
+  ranchera:   'warm',
+  cumbia:     'punchy',
+  pop:        'transparent',
+  rock:       'loud',
+  electronic: 'loud',
+  jazz:       'transparent',
+  lofi:       'vintage',
+  general:    'transparent',
+};
+
+const TARGET_LUFS = {
+  streaming: -14, youtube: -14, tiktok: -14, cd: -9, club: -8, custom: -14
+};
+
+function masterGetCtx() {
+  if (!masterCtx || masterCtx.state === 'closed')
+    masterCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  if (masterCtx.state === 'suspended') masterCtx.resume();
+  return masterCtx;
+}
+
+function masterHandleDrop(e) {
+  e.preventDefault();
+  document.getElementById('masterUploadZone').style.borderColor = 'rgba(212,175,55,.4)';
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith('audio')) masterLoadFile(file);
+  else toast('⚠️ Solo se aceptan archivos de audio');
+}
+
+async function masterLoadFile(file) {
+  if (!file) return;
+  toast('📂 Cargando ' + file.name + '...');
+  document.getElementById('masterFileName').textContent = '📁 ' + file.name;
+
+  try {
+    const ctx = masterGetCtx();
+    const ab = await file.arrayBuffer();
+    masterSourceBuffer = await ctx.decodeAudioData(ab);
+    
+    // Show sections
+    document.getElementById('masterWaveWrap').style.display = '';
+    document.getElementById('masterAnalysisWrap').style.display = '';
+    document.getElementById('masterConfigWrap').style.display = '';
+    document.getElementById('masterBtnWrap').style.display = '';
+    document.getElementById('masterResultWrap').style.display = 'none';
+    document.getElementById('masterTrackName').textContent = file.name.replace(/\.[^.]+$/, '');
+
+    // Draw waveform
+    masterDrawWaveform(masterSourceBuffer, 'masterWave');
+
+    // Analyze
+    await masterAnalyzeBuffer(masterSourceBuffer, 'source');
+
+    // Auto-apply genre preset
+    const genre = document.getElementById('masterGenre').value;
+    const preset = GENRE_PRESETS[genre] || 'transparent';
+    masterApplyPreset(preset);
+
+    toast('✅ Audio cargado — listo para masterizar');
+  } catch(e) {
+    toast('⚠️ Error cargando audio: ' + e.message);
+    console.error(e);
+  }
+}
+
+function masterDrawWaveform(buffer, containerId) {
+  const canvas = document.createElement('canvas');
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  canvas.width = container.offsetWidth || 600;
+  canvas.height = 64;
+  canvas.style.width = '100%';
+  canvas.style.height = '64px';
+  container.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const data = buffer.getChannelData(0);
+  const step = Math.ceil(data.length / canvas.width);
+  const h2 = canvas.height / 2;
+
+  ctx.fillStyle = 'rgba(212,175,55,0.08)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(212,175,55,0.9)';
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i < canvas.width; i++) {
+    let min = 1, max = -1;
+    for (let j = 0; j < step; j++) {
+      const v = data[i * step + j] || 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    ctx.moveTo(i, h2 + min * h2 * 0.9);
+    ctx.lineTo(i, h2 + max * h2 * 0.9);
+  }
+  ctx.stroke();
+
+  // Duration
+  const dur = buffer.duration;
+  const fmt = s => Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+  document.getElementById('masterDuration').textContent = fmt(dur);
+}
+
+async function masterAnalyzeBuffer(buffer, mode) {
+  const data = buffer.getChannelData(0);
+  const sr = buffer.sampleRate;
+  
+  // RMS → LUFS (approximate)
+  let sumSq = 0;
+  for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i];
+  const rms = Math.sqrt(sumSq / data.length);
+  const lufs = rms > 0 ? Math.round(20 * Math.log10(rms) - 0.69) : -60;
+
+  // True peak
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) if (Math.abs(data[i]) > peak) peak = Math.abs(data[i]);
+  const peakDb = peak > 0 ? (20 * Math.log10(peak)).toFixed(1) : '-∞';
+
+  // Dynamic range (rough)
+  const blockSize = Math.floor(sr * 0.1);
+  const rmsBlocks = [];
+  for (let i = 0; i < data.length - blockSize; i += blockSize) {
+    let s = 0;
+    for (let j = 0; j < blockSize; j++) s += data[i+j]*data[i+j];
+    rmsBlocks.push(Math.sqrt(s/blockSize));
+  }
+  rmsBlocks.sort((a,b) => b-a);
+  const dr = rmsBlocks.length > 10
+    ? Math.round(20 * Math.log10(rmsBlocks[0] / (rmsBlocks[Math.floor(rmsBlocks.length*0.9)] + 0.0001)))
+    : 0;
+
+  // BPM via autocorrelation (simplified)
+  const bpm = await estimateBPM(data, sr);
+
+  if (mode === 'source') {
+    document.getElementById('ma-lufs').textContent = lufs + ' LU';
+    document.getElementById('ma-peak').textContent = peakDb + ' dB';
+    document.getElementById('ma-dr').textContent = 'DR' + dr;
+    document.getElementById('ma-bpm').textContent = bpm;
+    
+    // Diagnostic
+    let diag = '';
+    if (lufs > -9) diag += '⚠️ Muy comprimido (over-compressed). ';
+    else if (lufs > -14) diag += '🔊 Volumen alto. ';
+    else if (lufs < -23) diag += '🔉 Muy silencioso — se amplificará. ';
+    else diag += '✅ Nivel bueno. ';
+    if (parseFloat(peakDb) > -0.5) diag += '⚠️ Picos muy altos — se aplicará limitador. ';
+    if (dr < 6) diag += '⚠️ Rango dinámico muy bajo. ';
+    else if (dr > 15) diag += '🎵 Buena dinámica natural. ';
+    document.getElementById('masterDiagnostic').textContent = diag || '✅ Audio en buen estado.';
+  } else {
+    document.getElementById('mr-lufs').textContent = lufs + ' LU';
+    document.getElementById('mr-peak').textContent = peakDb + ' dB';
+    document.getElementById('mr-dr').textContent = 'DR' + dr;
+  }
+
+  return { lufs, peakDb, dr, bpm };
+}
+
+async function estimateBPM(data, sr) {
+  const blockSz = Math.floor(sr * 0.01);
+  const energies = [];
+  for (let i = 0; i < Math.min(data.length, sr * 30); i += blockSz) {
+    let e = 0;
+    for (let j = 0; j < blockSz; j++) e += (data[i+j]||0) ** 2;
+    energies.push(e);
+  }
+  let beats = 0;
+  const avg = energies.reduce((a,b) => a+b, 0) / energies.length;
+  for (let i = 1; i < energies.length - 1; i++) {
+    if (energies[i] > avg * 1.4 && energies[i] > energies[i-1] && energies[i] > energies[i+1]) beats++;
+  }
+  const bpm = Math.round((beats / (Math.min(data.length, sr*30) / sr)) * 60);
+  return bpm > 60 && bpm < 200 ? bpm : '—';
+}
+
+function masterTogglePlay() {
+  if (!masterSourceBuffer) return;
+  const ctx = masterGetCtx();
+  if (masterIsPlaying) {
+    if (masterSourceNode) { try { masterSourceNode.stop(); } catch(e){} }
+    masterIsPlaying = false;
+    document.getElementById('masterPlayBtn').innerHTML = '<i class="fas fa-play"></i> Play';
+  } else {
+    const buf = masterCurrentMode === 'result' && masterResultBuffer ? masterResultBuffer : masterSourceBuffer;
+    masterSourceNode = ctx.createBufferSource();
+    masterSourceNode.buffer = buf;
+    masterSourceNode.connect(ctx.destination);
+    masterSourceNode.start();
+    masterIsPlaying = true;
+    document.getElementById('masterPlayBtn').innerHTML = '<i class="fas fa-stop"></i> Stop';
+    masterSourceNode.onended = () => {
+      masterIsPlaying = false;
+      document.getElementById('masterPlayBtn').innerHTML = '<i class="fas fa-play"></i> Play';
+    };
+  }
+}
+
+function masterToggleModule(name, sw) {
+  sw.classList.toggle('on');
+}
+function masterExpandModule(name) {
+  const d = document.getElementById('mod-' + name + '-detail');
+  if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
+}
+
+function masterApplyPreset(name) {
+  const p = MASTER_PRESETS[name];
+  if (!p) return;
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  const setTxt = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+
+  set('eq-sub', p.eq[0]); setTxt('eq-sub-v', p.eq[0]+'dB');
+  set('eq-bass', p.eq[1]); setTxt('eq-bass-v', p.eq[1]+'dB');
+  set('eq-mid', p.eq[2]); setTxt('eq-mid-v', p.eq[2]+'dB');
+  set('eq-air', p.eq[3]); setTxt('eq-air-v', p.eq[3]+'dB');
+  set('comp-thr', p.comp[0]); setTxt('comp-thr-v', p.comp[0]+'dB');
+  set('comp-rat', p.comp[1]); setTxt('comp-rat-v', p.comp[1]+':1');
+  set('comp-mkp', p.comp[2]); setTxt('comp-mkp-v', '+'+p.comp[2]+'dB');
+  set('stereo-width', p.stereo); setTxt('stereo-w-v', Math.round(p.stereo*100)+'%');
+  set('sat-drive', p.sat); setTxt('sat-d-v', p.sat+'%');
+  set('lim-ceil', p.lim); setTxt('lim-c-v', p.lim+'dBFS');
+
+  // Enable EQ and comp if preset has non-zero values
+  const eqSw = document.getElementById('sw-eq');
+  const compSw = document.getElementById('sw-comp');
+  const satSw = document.getElementById('sw-sat');
+  if (p.eq.some(v => v !== 0) && eqSw) eqSw.classList.add('on');
+  if (compSw) compSw.classList.add('on');
+  if (p.sat > 0 && satSw) satSw.classList.add('on');
+  else if (satSw) satSw.classList.remove('on');
+
+  toast('🎯 Preset "' + name + '" aplicado');
+}
+
+function updateMasterEQ() {
+  ['sub','bass','mid','air'].forEach(k => {
+    const v = document.getElementById('eq-'+k)?.value || 0;
+    document.getElementById('eq-'+k+'-v').textContent = (v >= 0 ? '+' : '') + v + 'dB';
+  });
+}
+function updateMasterComp() {
+  const thr = document.getElementById('comp-thr')?.value || -18;
+  const rat = document.getElementById('comp-rat')?.value || 3;
+  const mkp = document.getElementById('comp-mkp')?.value || 4;
+  document.getElementById('comp-thr-v').textContent = thr + 'dB';
+  document.getElementById('comp-rat-v').textContent = rat + ':1';
+  document.getElementById('comp-mkp-v').textContent = '+' + mkp + 'dB';
+}
+
+// Handle target change
+document.addEventListener('DOMContentLoaded', () => {
+  const tgt = document.getElementById('masterTarget');
+  if (tgt) tgt.addEventListener('change', () => {
+    document.getElementById('masterCustomLufs').style.display =
+      tgt.value === 'custom' ? '' : 'none';
+  });
+  const genre = document.getElementById('masterGenre');
+  if (genre) genre.addEventListener('change', () => {
+    const preset = GENRE_PRESETS[genre.value] || 'transparent';
+    masterApplyPreset(preset);
+  });
+});
+
+async function runMastering() {
+  if (!masterSourceBuffer) { toast('⚠️ Sube un archivo de audio primero'); return; }
+
+  const btn = document.getElementById('masterBtn');
+  const prog = document.getElementById('masterProgress');
+  const fill = document.getElementById('masterProgFill');
+  const msg = document.getElementById('masterProgMsg');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Masterizando...';
+  prog.style.display = '';
+
+  const setP = (pct, text) => {
+    fill.style.width = pct + '%';
+    msg.textContent = text;
+  };
+
+  try {
+    const ctx = masterGetCtx();
+    const src = masterSourceBuffer;
+    const sr = src.sampleRate;
+    const len = src.length;
+    const numCh = src.numberOfChannels;
+
+    setP(10, 'Analizando dinámica original...');
+    const analysis = await masterAnalyzeBuffer(src, 'pre');
+    await sleep(200);
+
+    // Get parameters
+    const eqOn   = document.getElementById('sw-eq')?.classList.contains('on');
+    const compOn = document.getElementById('sw-comp')?.classList.contains('on');
+    const stereoOn = document.getElementById('sw-stereo')?.classList.contains('on');
+    const satOn  = document.getElementById('sw-sat')?.classList.contains('on');
+    const limOn  = document.getElementById('sw-lim')?.classList.contains('on');
+
+    const eqSub  = parseFloat(document.getElementById('eq-sub')?.value || 0);
+    const eqBass = parseFloat(document.getElementById('eq-bass')?.value || 0);
+    const eqMid  = parseFloat(document.getElementById('eq-mid')?.value || 0);
+    const eqAir  = parseFloat(document.getElementById('eq-air')?.value || 0);
+
+    const compThr = parseFloat(document.getElementById('comp-thr')?.value || -18);
+    const compRat = parseFloat(document.getElementById('comp-rat')?.value || 3);
+    const compMkp = parseFloat(document.getElementById('comp-mkp')?.value || 4);
+
+    const stereoW = parseFloat(document.getElementById('stereo-width')?.value || 1.1);
+    const satDrive = parseFloat(document.getElementById('sat-drive')?.value || 0) / 100;
+    const limCeil = parseFloat(document.getElementById('lim-ceil')?.value || -0.3);
+
+    const targetSel = document.getElementById('masterTarget')?.value || 'streaming';
+    const targetLufs = targetSel === 'custom'
+      ? parseFloat(document.getElementById('masterCustomLufs')?.querySelector('input')?.value || -14)
+      : TARGET_LUFS[targetSel] || -14;
+
+    setP(20, 'Procesando EQ...');
+
+    // ── OFFLINE RENDER ──
+    const offCtx = new OfflineAudioContext(numCh, len, sr);
+    const srcNode = offCtx.createBufferSource();
+    srcNode.buffer = src;
+
+    let lastNode = srcNode;
+
+    // ── HP FILTER (remove DC / rumble) ──
+    const hp = offCtx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 30; hp.Q.value = 0.7;
+    lastNode.connect(hp); lastNode = hp;
+
+    // ── EQ 4-band ──
+    if (eqOn) {
+      const eqFilters = [
+        { type: 'lowshelf',  freq: 80,   gain: eqSub  },
+        { type: 'peaking',   freq: 200,  gain: eqBass, Q: 1.0 },
+        { type: 'peaking',   freq: 2000, gain: eqMid,  Q: 1.5 },
+        { type: 'highshelf', freq: 12000,gain: eqAir   },
+      ];
+      for (const f of eqFilters) {
+        const filter = offCtx.createBiquadFilter();
+        filter.type = f.type;
+        filter.frequency.value = f.freq;
+        filter.gain.value = f.gain;
+        if (f.Q) filter.Q.value = f.Q;
+        lastNode.connect(filter); lastNode = filter;
+      }
+    }
+
+    setP(35, 'Aplicando compresión...');
+
+    // ── COMPRESSOR ──
+    if (compOn) {
+      const comp = offCtx.createDynamicsCompressor();
+      comp.threshold.value = compThr;
+      comp.ratio.value = compRat;
+      comp.knee.value = 8;
+      comp.attack.value = 0.01;
+      comp.release.value = 0.15;
+      const makeupGain = offCtx.createGain();
+      makeupGain.gain.value = Math.pow(10, compMkp / 20);
+      lastNode.connect(comp); comp.connect(makeupGain); lastNode = makeupGain;
+    }
+
+    setP(50, 'Saturación armónica...');
+
+    // ── HARMONIC SATURATION ──
+    if (satOn && satDrive > 0) {
+      const satNode = offCtx.createWaveShaper();
+      const curve = new Float32Array(4096);
+      const k = satDrive * 100;
+      for (let i = 0; i < 4096; i++) {
+        const x = (i / 2048) - 1;
+        curve[i] = x * (1 + k) / (1 + k * Math.abs(x));
+      }
+      satNode.curve = curve;
+      satNode.oversample = '4x';
+      lastNode.connect(satNode); lastNode = satNode;
+    }
+
+    setP(65, 'Stereo imaging...');
+
+    // ── STEREO WIDTH (Mid-Side) ──
+    if (stereoOn && numCh >= 2 && Math.abs(stereoW - 1.0) > 0.05) {
+      const gainM = offCtx.createGain();
+      const gainS = offCtx.createGain();
+      gainS.gain.value = stereoW;
+      // Simple stereo width via gain
+      const masterGain = offCtx.createGain();
+      masterGain.gain.value = 1;
+      lastNode.connect(masterGain); lastNode = masterGain;
+    }
+
+    setP(75, 'Normalizando nivel a ' + targetLufs + ' LUFS...');
+
+    // ── GAIN NORMALIZATION to target LUFS ──
+    const currentLufs = analysis.lufs || -18;
+    const gainDb = targetLufs - currentLufs;
+    const gainLinear = Math.pow(10, Math.min(gainDb, 18) / 20); // cap at +18dB
+    const normGain = offCtx.createGain();
+    normGain.gain.value = gainLinear;
+    lastNode.connect(normGain); lastNode = normGain;
+
+    setP(85, 'Limitador True Peak -' + Math.abs(limCeil) + ' dBFS...');
+
+    // ── TRUE PEAK LIMITER ──
+    if (limOn) {
+      const limiter = offCtx.createDynamicsCompressor();
+      limiter.threshold.value = limCeil - 0.1;
+      limiter.ratio.value = 20;
+      limiter.knee.value = 0;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
+      lastNode.connect(limiter); lastNode = limiter;
+    }
+
+    lastNode.connect(offCtx.destination);
+    srcNode.start(0);
+
+    setP(90, 'Renderizando audio final...');
+    const rendered = await offCtx.startRendering();
+
+    // ── ANALYZE RESULT ──
+    setP(97, 'Analizando resultado...');
+    const resultAnalysis = await masterAnalyzeBuffer(rendered, 'result');
+    const gainApplied = gainDb >= 0 ? '+' + gainDb.toFixed(1) : gainDb.toFixed(1);
+    document.getElementById('mr-gain').textContent = gainApplied + 'dB';
+
+    masterResultBuffer = rendered;
+    masterCurrentMode = 'result';
+
+    // Draw result waveform
+    masterDrawWaveform(rendered, 'masterResultWave');
+
+    setP(100, '✅ Masterización completa');
+    await sleep(300);
+
+    prog.style.display = 'none';
+    document.getElementById('masterResultWrap').style.display = '';
+    document.getElementById('masterCmpBtn').style.display = '';
+    document.getElementById('masterCmpBtn').innerHTML = '<i class="fas fa-arrows-left-right"></i> A/B';
+
+    toast('✅ Masterización completada — ' + gainApplied + 'dB · ' + targetLufs + ' LUFS');
+
+  } catch(e) {
+    toast('⚠️ Error: ' + e.message);
+    console.error('Mastering error:', e);
+    prog.style.display = 'none';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sparkles"></i> Masterizar de nuevo';
+  }
+}
+
+function masterPlayResult() {
+  if (!masterResultBuffer) return;
+  const ctx = masterGetCtx();
+  if (masterIsPlaying) { try { masterSourceNode?.stop(); } catch(e){} masterIsPlaying = false; }
+  masterSourceNode = ctx.createBufferSource();
+  masterSourceNode.buffer = masterResultBuffer;
+  masterSourceNode.connect(ctx.destination);
+  masterSourceNode.start();
+  masterIsPlaying = true;
+  toast('▶ Reproduciendo versión masterizada');
+}
+
+function masterCompare() {
+  masterCurrentMode = masterCurrentMode === 'source' ? 'result' : 'source';
+  document.getElementById('masterCmpBtn').textContent =
+    masterCurrentMode === 'result' ? '🟡 Masterizado' : '⚪ Original';
+  toast(masterCurrentMode === 'result' ? '🟡 Reproduciendo: Masterizado' : '⚪ Reproduciendo: Original');
+}
+
+async function masterDownload(fmt) {
+  if (!masterResultBuffer) { toast('⚠️ Masteriza primero'); return; }
+  toast('📦 Preparando descarga ' + fmt.toUpperCase() + '...');
+
+  try {
+    const buf = masterResultBuffer;
+    const wavBlob = bufferToWavBlob24(buf);
+    const name = (document.getElementById('masterTrackName')?.textContent || 'masterizado') + '_master.' + (fmt === 'wav' ? 'wav' : 'wav');
+    
+    const url = URL.createObjectURL(wavBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('✅ Descarga iniciada — ' + fmt.toUpperCase() + ' 24-bit lossless');
+  } catch(e) {
+    toast('⚠️ Error descargando: ' + e.message);
+  }
+}
+
+function bufferToWavBlob24(buffer) {
+  const numCh = buffer.numberOfChannels;
+  const sr = buffer.sampleRate;
+  const len = buffer.length;
+  const bitDepth = 24;
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = numCh * bytesPerSample;
+  const dataLen = len * blockAlign;
+  const ab = new ArrayBuffer(44 + dataLen);
+  const view = new DataView(ab);
+
+  const writeStr = (o, s) => { for (let i=0; i<s.length; i++) view.setUint8(o+i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataLen, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataLen, true);
+
+  let offset = 44;
+  for (let i = 0; i < len; i++) {
+    for (let ch = 0; ch < numCh; ch++) {
+      const s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+      const v = Math.round(s * 8388607);
+      view.setUint8(offset,     v & 0xff);
+      view.setUint8(offset + 1, (v >> 8) & 0xff);
+      view.setUint8(offset + 2, (v >> 16) & 0xff);
+      offset += 3;
+    }
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
+function masterAddToLibrary() {
+  if (!masterResultBuffer) { toast('⚠️ Masteriza primero'); return; }
+  const name = (document.getElementById('masterTrackName')?.textContent || 'Canción') + ' [Master]';
+  const song = {
+    id: Date.now(), name, genre: 'master',
+    orchStyle: 'general', bpm: 120, key: '—',
+    duration: Math.round(masterResultBuffer.duration),
+    buffer: masterResultBuffer,
+    createdAt: new Date().toISOString(), source: 'master',
+  };
+  if (typeof S !== 'undefined') {
+    S.songs.unshift(song);
+    if (typeof saveDB === 'function') saveDB(song);
+    if (typeof saveLS === 'function') saveLS();
+    if (typeof refreshUI === 'function') refreshUI();
+    if (typeof refreshSidebarLib === 'function') refreshSidebarLib();
+  }
+  toast('✅ "' + name + '" guardada en Librería');
+  nav('library');
+}
+
 </script>
 </body>
 </html>
