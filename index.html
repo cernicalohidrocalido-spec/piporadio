@@ -5843,56 +5843,68 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
       const pdStr = JSON.stringify(pd);
       if (i % 3 === 0) addLog('📡 Feed: ' + pdStr.substring(0, 200));
 
-      // udioapi.pro response when done:
-      // {"code":200,"data":{"type":"SUCCESS","clips":[{"audio_url":"...","title":"..."}]}}
-      // or {"code":200,"data":[{"audio_url":"..."}]}
+      // udioapi.pro real response structure (confirmed):
+      // {"code":200,"data":{"type":"SUCCESS","response_data":[{"audio_url":"...","title":"..."}]}}
       const dataType = pd?.data?.type || pd?.type || '';
+      const pdStr2 = JSON.stringify(pd?.data || pd).substring(0, 80);
 
       // Still processing — keep polling
-      if (dataType === 'IN_PROGRESS' || dataType === 'PENDING' || dataType === 'PROCESSING') {
+      if (dataType === 'IN_PROGRESS' || dataType === 'PENDING' || dataType === 'PROCESSING' || dataType === '') {
         continue;
       }
 
       // Check for error
-      if (dataType === 'ERROR' || dataType === 'FAILED') {
-        throw new Error('Suno error: ' + (pd?.data?.error_message || dataType));
+      if (dataType === 'ERROR' || dataType === 'FAILED' || dataType === 'CANCELLED') {
+        const errMsg = pd?.data?.response_data?.[0]?.error_message || pd?.data?.error_message || dataType;
+        throw new Error('Suno error: ' + errMsg);
       }
 
-      // Try to find audio URL — check all possible locations
-      let audioUrl = null;
-      let audioName = songTitle;
+      if (dataType === 'SUCCESS' || dataType === 'COMPLETE' || dataType === 'COMPLETED') {
+        // Primary location: data.response_data[0].audio_url (confirmed real structure)
+        let audioUrl = null;
+        let audioName = songTitle;
 
-      // Check data.clips array (most common)
-      const clips = pd?.data?.clips || pd?.clips || pd?.data?.songs || pd?.songs || [];
-      if (Array.isArray(clips) && clips.length > 0) {
-        const clip = clips[0];
-        audioUrl = clip?.audio_url || clip?.audioUrl || clip?.url || clip?.mp3_url;
-        audioName = clip?.title || clip?.name || songTitle;
-      }
+        const rd = pd?.data?.response_data;
+        if (Array.isArray(rd) && rd.length > 0) {
+          audioUrl = rd[0]?.audio_url || rd[0]?.audioUrl || rd[0]?.url || rd[0]?.mp3_url;
+          audioName = rd[0]?.title || rd[0]?.name || songTitle;
+        }
 
-      // Check data directly
-      if (!audioUrl) {
-        const d = pd?.data || pd;
-        audioUrl = d?.audio_url || d?.audioUrl || d?.url || d?.mp3_url || d?.output_url;
-        audioName = d?.title || d?.name || songTitle;
-      }
+        // Fallback: data.clips, data.songs, data.tracks
+        if (!audioUrl) {
+          for (const key of ['clips','songs','tracks','outputs']) {
+            const arr = pd?.data?.[key];
+            if (Array.isArray(arr) && arr.length > 0) {
+              audioUrl = arr[0]?.audio_url || arr[0]?.audioUrl || arr[0]?.url;
+              audioName = arr[0]?.title || songTitle;
+              if (audioUrl) break;
+            }
+          }
+        }
 
-      // Check top-level arrays
-      if (!audioUrl && Array.isArray(pd?.data)) {
-        const item = pd.data[0];
-        audioUrl = item?.audio_url || item?.audioUrl || item?.url;
-        audioName = item?.title || songTitle;
-      }
+        // Fallback: data.audio_url directly
+        if (!audioUrl) {
+          audioUrl = pd?.data?.audio_url || pd?.data?.url || pd?.audio_url;
+          audioName = pd?.data?.title || songTitle;
+        }
 
-      if (audioUrl && (audioUrl.startsWith('http') || audioUrl.startsWith('/'))) {
-        addLog('✅ Audio listo (' + elapsed + 's): ' + audioName);
-        return await _downloadDecode(audioUrl, audioName);
-      }
+        // Fallback: top-level array
+        if (!audioUrl && Array.isArray(pd?.data)) {
+          audioUrl = pd.data[0]?.audio_url || pd.data[0]?.url;
+          audioName = pd.data[0]?.title || songTitle;
+        }
 
-      // If SUCCESS but no audio_url yet, keep polling a bit more
-      if (dataType === 'SUCCESS' && !audioUrl) {
-        addLog('⚠️ SUCCESS pero sin audio_url — esperando...');
-        continue;
+        if (audioUrl && (audioUrl.startsWith('http') || audioUrl.startsWith('/'))) {
+          addLog('✅ Audio listo (' + elapsed + 's): ' + audioName);
+          addLog('🔗 URL: ' + audioUrl.substring(0, 60) + '...');
+          return await _downloadDecode(audioUrl, audioName);
+        }
+
+        // SUCCESS but no URL yet — could be a brief delay, keep polling 3 more times
+        if (dataType === 'SUCCESS') {
+          addLog('⏳ SUCCESS recibido, esperando URL de audio...');
+          continue;
+        }
       }
 
     } catch(e) {
@@ -6425,7 +6437,7 @@ async function runMastering() {
 
     const stereoW = parseFloat(document.getElementById('stereo-width')?.value || 1.1);
     const satDrive = parseFloat(document.getElementById('sat-drive')?.value || 0) / 100;
-    const limCeil = parseFloat(document.getElementById('lim-ceil')?.value || -0.3);
+    const limCeil = parseFloat(document.getElementById('lim-ceil')?.value || '-0.3');
 
     const targetSel = document.getElementById('masterTarget')?.value || 'streaming';
     const targetLufs = targetSel === 'custom'
