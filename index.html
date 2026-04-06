@@ -5598,7 +5598,7 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
   for (let i = 0; i < 90; i++) {
     await sleep(8000);
     const elapsed = ((i + 1) * 8);
-    if (i % 3 === 0) addLog('⏳ ' + elapsed + 's... generando en Suno');
+    if (i % 3 === 0) addLog('⏳ ' + elapsed + 's — Suno procesando...');
 
     try {
       const feedPath = '/api/feed?workId=' + workId;
@@ -5610,25 +5610,64 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
       if (!pr.ok) { addLog('Feed HTTP ' + pr.status + ' — reintentando...'); continue; }
 
       const pd = await pr.json();
-      if (i % 3 === 0) addLog('📡 Feed: ' + JSON.stringify(pd).substring(0, 150));
+      const pdStr = JSON.stringify(pd);
+      if (i % 3 === 0) addLog('📡 Feed: ' + pdStr.substring(0, 200));
 
-      const found = findAudio(pd);
-      if (found) {
-        addLog('✅ Audio listo (' + elapsed + 's): ' + found.name);
-        return await _downloadDecode(found.url, found.name);
+      // udioapi.pro response when done:
+      // {"code":200,"data":{"type":"SUCCESS","clips":[{"audio_url":"...","title":"..."}]}}
+      // or {"code":200,"data":[{"audio_url":"..."}]}
+      const dataType = pd?.data?.type || pd?.type || '';
+
+      // Still processing — keep polling
+      if (dataType === 'IN_PROGRESS' || dataType === 'PENDING' || dataType === 'PROCESSING') {
+        continue;
       }
 
-      // Check failure state
-      const items = Array.isArray(pd?.data) ? pd.data : (pd?.data ? [pd.data] : [pd]);
-      for (const item of items) {
-        const st = (item?.status || item?.state || '').toLowerCase();
-        if (st === 'error' || st === 'failed' || st === 'cancelled') {
-          throw new Error('Suno reportó error: ' + (item?.error_message || st));
-        }
+      // Check for error
+      if (dataType === 'ERROR' || dataType === 'FAILED') {
+        throw new Error('Suno error: ' + (pd?.data?.error_message || dataType));
       }
+
+      // Try to find audio URL — check all possible locations
+      let audioUrl = null;
+      let audioName = songTitle;
+
+      // Check data.clips array (most common)
+      const clips = pd?.data?.clips || pd?.clips || pd?.data?.songs || pd?.songs || [];
+      if (Array.isArray(clips) && clips.length > 0) {
+        const clip = clips[0];
+        audioUrl = clip?.audio_url || clip?.audioUrl || clip?.url || clip?.mp3_url;
+        audioName = clip?.title || clip?.name || songTitle;
+      }
+
+      // Check data directly
+      if (!audioUrl) {
+        const d = pd?.data || pd;
+        audioUrl = d?.audio_url || d?.audioUrl || d?.url || d?.mp3_url || d?.output_url;
+        audioName = d?.title || d?.name || songTitle;
+      }
+
+      // Check top-level arrays
+      if (!audioUrl && Array.isArray(pd?.data)) {
+        const item = pd.data[0];
+        audioUrl = item?.audio_url || item?.audioUrl || item?.url;
+        audioName = item?.title || songTitle;
+      }
+
+      if (audioUrl && (audioUrl.startsWith('http') || audioUrl.startsWith('/'))) {
+        addLog('✅ Audio listo (' + elapsed + 's): ' + audioName);
+        return await _downloadDecode(audioUrl, audioName);
+      }
+
+      // If SUCCESS but no audio_url yet, keep polling a bit more
+      if (dataType === 'SUCCESS' && !audioUrl) {
+        addLog('⚠️ SUCCESS pero sin audio_url — esperando...');
+        continue;
+      }
+
     } catch(e) {
-      if (e.message.includes('reportó error')) throw e;
-      addLog('⚠️ Poll error: ' + e.message.substring(0,60));
+      if (e.message.includes('Suno error')) throw e;
+      addLog('⚠️ Poll error: ' + e.message.substring(0, 80));
     }
   }
   throw new Error('Timeout 12min — Suno muy ocupado. Intenta de nuevo.');
