@@ -1409,10 +1409,10 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
       </div>
     </div>
 
-    <!-- SUNO API — gcui-art/suno-api -->
-    <div class="card" style="margin-bottom:14px;border-color:rgba(212,175,55,.25)">
-      <div class="card-title"><i class="fas fa-music" style="color:var(--gold)"></i> Suno — Música real de calidad profesional
-        <span class="api-tier-badge">⭐ Recomendado</span>
+    <!-- UDIOAPI.PRO — Generación de música real -->
+    <div class="card" style="margin-bottom:14px;border-color:rgba(212,175,55,.35);box-shadow:0 0 20px rgba(212,175,55,.1)">
+      <div class="card-title"><i class="fas fa-music" style="color:var(--gold)"></i> udioapi.pro — Música IA de calidad profesional real
+        <span class="api-tier-badge">⭐ ACTIVO</span>
       </div>
 
       <!-- Step 1: Cookie -->
@@ -5246,29 +5246,43 @@ function checkAPIStatus(service, value) {
 }
 
 async function testSunoKey() {
-  const url = document.getElementById('sunoKey')?.value?.trim();
-  if (!url) { toast('⚠️ Ingresa la URL de tu suno-api en Vercel'); return; }
+  const key = document.getElementById('sunoKey')?.value?.trim();
+  if (!key) { toast('⚠️ Ingresa tu udioapi.pro API key'); return; }
   const badge = document.getElementById('badge-suno');
-  toast('🔍 Conectando a suno-api...');
+  toast('🔍 Verificando udioapi.pro...');
   try {
-    // Test the gcui-art/suno-api /api/get_limit endpoint
-    const baseUrl = url.replace(/\/+$/, '');
-    const res = await fetch(baseUrl + '/api/get_limit');
+    const res = await fetch('https://udioapi.pro/api/query-credits', {
+      headers: { 'Authorization': 'Bearer ' + key }
+    });
     if (res.ok) {
       const data = await res.json();
-      const credits = data?.credits_left ?? data?.monthly_limit ?? '?';
+      const credits = data?.credits ?? data?.balance ?? data?.data?.credits ?? '?';
       if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ ' + credits + ' créditos'; }
       saveAPIKeys();
-      toast('✅ suno-api conectado — ' + credits + ' créditos disponibles');
+      // Auto-enable Suno mode
+      SUNO_MODE = true;
+      localStorage.setItem('suno_mode', 'true');
+      const sw = document.getElementById('sw-suno');
+      if (sw) sw.classList.add('on');
+      toast('✅ udioapi.pro conectado — ' + credits + ' créditos · Modo IA activado automáticamente');
+    } else if (res.status === 401) {
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Key inválida'; }
+      toast('⚠️ API key incorrecta — verifica en udioapi.pro/dashboard');
     } else {
-      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Error ' + res.status; }
-      toast('⚠️ No se pudo conectar — verifica la URL de Vercel');
+      // Save anyway — CORS might block the check
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Key guardada'; }
+      saveAPIKeys();
+      SUNO_MODE = true; localStorage.setItem('suno_mode','true');
+      const sw = document.getElementById('sw-suno'); if(sw) sw.classList.add('on');
+      toast('✅ Key guardada — modo IA activado');
     }
   } catch(e) {
-    // Might be CORS — save anyway
-    if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ URL guardada'; }
+    // CORS error — save anyway and trust the key
+    if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Key guardada'; }
     saveAPIKeys();
-    toast('✅ URL guardada — se usará al generar');
+    SUNO_MODE = true; localStorage.setItem('suno_mode','true');
+    const sw = document.getElementById('sw-suno'); if(sw) sw.classList.add('on');
+    toast('✅ Key guardada — se verificará al generar');
   }
 }
 
@@ -5324,128 +5338,140 @@ function toggleSunoMode(sw) {
 }
 
 async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
-  const sunoUrl = getAPIKey('suno');
-  if (!sunoUrl) throw new Error('No suno-api URL configured');
-  const baseUrl = sunoUrl.replace(/\/+$/, '');
-  const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
+  const apiKey = getAPIKey('suno');
+  if (!apiKey) throw new Error('No udioapi.pro API key configurada');
 
-  const sunoPrompt = buildSunoPrompt(prompt, orchStyle, bpm, key_sig);
-  addLog('🎵 Enviando a suno-api: ' + sunoPrompt.substring(0,70)+'...');
+  const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
 
   const isInstrumental = document.getElementById('lm-none')?.classList.contains('on');
   const lyrics = !isInstrumental ? (document.getElementById('songLyrics')?.value?.trim() || '') : '';
+  const songTitle = document.getElementById('songName')?.value?.trim() || 'PipoRadio Song';
+  const model = document.getElementById('sunoModel')?.value || 'chirp-v4-5';
+  const sunoStyle = buildSunoPrompt(prompt, orchStyle, bpm, key_sig);
 
-  // Use custom_generate if we have lyrics, generate otherwise
-  let genRes;
+  addLog('🎵 Generando con udioapi.pro — ' + model);
+  addLog('🎼 Estilo: ' + sunoStyle.substring(0,80) + '...');
+
+  // Build request body
+  const body = {
+    model: model,
+    make_instrumental: isInstrumental,
+    style_weight: 0.7,
+    weirdness_constraint: 0.3,
+    gender: 'male',
+  };
+
   if (lyrics && lyrics.length > 10) {
-    addLog('📝 Modo custom (con letra)...');
-    genRes = await fetch(baseUrl + '/api/custom_generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: sunoPrompt,
-        lyrics: lyrics,
-        title: document.getElementById('songName')?.value || 'PipoRadio Song',
-        make_instrumental: false,
-        wait_audio: false,
-      })
-    });
+    // Custom mode with lyrics
+    body.prompt = lyrics.substring(0, 3000);
+    body.style = sunoStyle.substring(0, 500);
+    body.title = songTitle;
+    addLog('📝 Modo personalizado — con letra');
   } else {
-    genRes = await fetch(baseUrl + '/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: sunoPrompt,
-        make_instrumental: isInstrumental,
-        wait_audio: false,
-      })
-    });
+    // Inspiration mode
+    body.gpt_description_prompt = sunoStyle.substring(0, 400);
+    body.title = songTitle;
+    addLog('💡 Modo inspiración — sin letra');
   }
+
+  const genRes = await fetch('https://udioapi.pro/api/v2/generate', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  });
 
   if (!genRes.ok) {
     const errText = await genRes.text();
-    throw new Error('suno-api error ' + genRes.status + ': ' + errText.substring(0,100));
+    throw new Error('udioapi.pro error ' + genRes.status + ': ' + errText.substring(0,150));
   }
 
   const genData = await genRes.json();
-  const clips = Array.isArray(genData) ? genData : (genData.clips || []);
-  if (!clips.length) throw new Error('suno-api no devolvió clips');
+  const taskId = genData?.workId || genData?.data?.task_id;
+  if (!taskId) throw new Error('No se recibió task_id de udioapi.pro: ' + JSON.stringify(genData).substring(0,100));
 
-  const clipId = clips[0].id;
-  addLog('⏳ Generando audio (ID: ' + clipId + ')...');
+  addLog('⏳ Generando (task: ' + taskId + ') — tarda ~60-90s...');
 
-  // Poll for completion using /api/get
+  // Poll for completion
   for (let i = 0; i < 60; i++) {
     await sleep(4000);
-    addLog('⏳ Esperando audio... (' + (i*4) + 's / ~60s normal)');
+    if (i % 3 === 0) addLog('⏳ Procesando... ' + (i*4) + 's');
 
-    const pollRes = await fetch(baseUrl + '/api/get?ids=' + clipId);
+    let pollRes;
+    try {
+      pollRes = await fetch('https://udioapi.pro/api/v2/feed?taskId=' + taskId, {
+        headers: { 'Authorization': 'Bearer ' + apiKey }
+      });
+    } catch(e) { continue; }
+
     if (!pollRes.ok) continue;
 
     const pollData = await pollRes.json();
-    const clip = Array.isArray(pollData) ? pollData[0] : pollData;
+    const clips = pollData?.data || pollData?.clips || (Array.isArray(pollData) ? pollData : []);
+    const clip = Array.isArray(clips) ? clips[0] : clips;
 
-    if (clip?.status === 'complete' && clip?.audio_url) {
-      addLog('✅ Audio listo: ' + (clip.title || clip.id));
-      // Download and decode the audio
-      const audioRes = await fetch(clip.audio_url);
+    if (!clip) continue;
+
+    const status = clip?.status || clip?.state || '';
+    const audioUrl = clip?.audio_url || clip?.audioUrl || clip?.url;
+
+    if ((status === 'complete' || status === 'SUCCESS' || status === 'streaming') && audioUrl) {
+      addLog('✅ Audio listo: ' + (clip.title || clip.id || 'canción generada'));
+      addLog('📥 Descargando audio...');
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) throw new Error('No se pudo descargar el audio');
       const ab = await audioRes.arrayBuffer();
       const buf = await getCtx().decodeAudioData(ab);
       return {
         buffer: buf,
-        name: clip.title || document.getElementById('songName')?.value || 'Suno Song',
-        sunoClipId: clipId,
-        imageUrl: clip.image_url,
+        name: clip.title || songTitle,
+        taskId: taskId,
+        imageUrl: clip.image_url || clip.imageUrl,
       };
     }
 
-    if (clip?.status === 'error') {
-      throw new Error('Suno error: ' + (clip.meta_data?.error_message || 'unknown'));
-    }
-
-    // Also check 'streaming' status - audio is ready to use
-    if (clip?.status === 'streaming' && clip?.audio_url) {
-      addLog('✅ Audio disponible (streaming): ' + (clip.title || clip.id));
-      const audioRes = await fetch(clip.audio_url);
-      const ab = await audioRes.arrayBuffer();
-      const buf = await getCtx().decodeAudioData(ab);
-      return {
-        buffer: buf,
-        name: clip.title || 'Suno Song',
-        sunoClipId: clipId,
-      };
+    if (status === 'error' || status === 'FAILED') {
+      throw new Error('Generación falló: ' + (clip?.error || clip?.message || 'error desconocido'));
     }
   }
-  throw new Error('Timeout esperando audio de Suno (>4 min)');
+  throw new Error('Timeout: la generación tardó más de 4 minutos. Intenta de nuevo.');
 }
 
 function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
+  // Ultra-precise style descriptions for udioapi.pro / Suno V4.5+
   const styleMap = {
-    grupero:'grupero norteño, acordeón norteño, bajo sexto, tololoche',
-    temerarios:'balada grupera romántica, piano Rhodes, sintetizadores suaves',
-    norteno:'norteño corrido, acordeón norteño, tuba',
-    ranchera:'ranchera mariachi, trompeta mariachi, violines jalicienses',
-    cumbia:'cumbia tropical colombiana, acordeón, caja vallenata, guacharaca',
-    tropicalisimo:'tropical caliente, órgano Farfisa, bajo eléctrico funky',
-    samuray:'quebradita techno-banda, acordeón, tambora',
-    banda:'banda sinaloense, tuba, trombones, clarinetes',
-    bachata:'bachata sensual, guitarra bossa, requinto, bongós',
-    salsa:'salsa tropical, piano montuno, congas, timbales, trompetas',
-    bolero:'bolero orquestal romántico, piano de cola, cuerdas orquestales',
-    reggaeton:'reggaeton urbano, 808 bass, dembow',
-    pop:'pop internacional, sintetizadores modernos, batería electrónica',
-    rock:'rock alternativo, guitarras eléctricas, bajo potente',
-    electronic:'electrónica synthwave, sintetizadores vintage, drum machine',
-    jazz:'jazz blues, piano, contrabajo, batería swing',
-    lofi:'lo-fi hip-hop, piano cálido, vinyl crackle, batería swing',
-    folk:'folk acústico, guitarra acústica, violines, contrabajo',
+    grupero:      'grupero norteño mexicano, acordeón diatónico fa/sib con adornos, bajo sexto percutido, tololoche profundo, batería norteña seca, coros gruperos',
+    temerarios:   'balada grupera romántica mexicana, piano Rhodes cálido, sintetizadores pad suaves en capas, cuerdas sintetizadas, bajo eléctrico suave, batería con escobillas',
+    norteno:      'norteño corrido mexicano, acordeón norteño con corridas, tuba profunda, bajo sexto, batería norteña, estilo norteño auténtico',
+    ranchera:     'ranchera mariachi mexicana tradicional, trompetas mariachi brillantes, violines jalicienses emotivos, vihuela rítmica, guitarrón profundo, mariachi en vivo',
+    cumbia:       'cumbia tropical colombo-mexicana, acordeón diatónico tropical, caja vallenata, guacharaca, bajo eléctrico funky, maracas, tropical festivo bailable',
+    tropicalisimo:'tropical caliente mexicano estilo Tropicalisimo Apache, órgano Farfisa vintage, bajo eléctrico funky prominente, congas, maracas, trompeta limpia',
+    samuray:      'quebradita norteña mexicana energética, acordeón con corridas rápidas, tambora de banda, bajo eléctrico, ritmo quebradita 140+ BPM, festivo bravío',
+    banda:        'banda sinaloense mexicana, tuba profunda, trombones, clarinetes, percusión de banda, vientos potentes, estilo sinaloense auténtico',
+    bachata:      'bachata dominicana sensual, guitarra bachata requinto melódico, bongós, güira, bajo eléctrico, romántico tropical',
+    salsa:        'salsa latina tropical, piano montuno cubano, congas y timbales, trompetas de salsa, bajo eléctrico, son cubano clave 2-3',
+    bolero:       'bolero orquestal romántico latino, piano de cola Steinway, cuerdas orquestales opulentas, contrabajo, producción lujosa',
+    reggaeton:    'reggaeton urbano latino moderno, 808 bass profundo, dembow ritmo, sintetizadores, trap latino',
+    pop:          'pop latino internacional, sintetizadores modernos, batería electrónica con kick potente, bajo sintetizado, producción brillante comercial',
+    rock:         'rock alternativo en español, guitarras eléctricas con overdrive, bajo potente, batería agresiva, energía rock',
+    electronic:   'electrónica synthwave, sintetizadores vintage analógicos, drum machine, arpegios, atmósfera electrónica',
+    jazz:         'jazz estándar, piano jazz, contrabajo pizzicato, batería con escobillas swing, trompeta en sordina, feel jazz auténtico',
+    lofi:         'lo-fi hip-hop chill, piano jazz sampleado con vinyl crackle, batería swing lo-fi, bajo woofer suave, nostálgico relajante',
+    folk:         'folk acústico, guitarra acústica fingerpicking, violines emotivos, contrabajo acústico, producción orgánica natural',
   };
-  const tags = styleMap[orchStyle] || orchStyle;
+
+  const styleDesc = styleMap[orchStyle] || orchStyle;
   const tpl = typeof TEMPLATES !== 'undefined' ? TEMPLATES[orchStyle] : null;
   const mood = tpl?.mood?.split(',')[0] || 'emotivo';
-  let p = tags + ', ' + bpm + ' BPM, ' + key_sig + ', ' + mood;
-  if (userPrompt?.length > 10) p += '. ' + userPrompt.substring(0,200);
-  return p;
+  const vocalDesc = tpl?.vocal?.split(',')[0] || '';
+
+  let parts = [styleDesc, bpm + ' BPM', key_sig, mood];
+  if (vocalDesc) parts.push(vocalDesc);
+  if (userPrompt?.length > 10) parts.push(userPrompt.substring(0,200));
+
+  return parts.join(', ');
 }
 
 async function generateVoiceWithElevenLabs(text, orchStyle) {
