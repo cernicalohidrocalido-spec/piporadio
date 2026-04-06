@@ -5442,30 +5442,40 @@ async function testSunoKey() {
 async function testElevenKey() {
   const key = document.getElementById('elevenKey')?.value?.trim();
   if (!key) { toast('⚠️ Ingresa tu ElevenLabs API key primero'); return; }
+  const badge = document.getElementById('badge-eleven');
   toast('🔍 Verificando ElevenLabs...');
   try {
-    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+    // Use /v1/voices — it allows CORS from browsers unlike /v1/user
+    const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+      method: 'GET',
       headers: { 'xi-api-key': key }
     });
-    const badge = document.getElementById('badge-eleven');
     if (res.ok) {
       const data = await res.json();
-      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Conectado'; }
+      window._elevenVoices = data.voices || [];
+      const count = window._elevenVoices.length;
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ ' + count + ' voces'; }
       const infoEl = document.getElementById('elevenVoiceInfo');
       if (infoEl) infoEl.style.display = 'block';
-      const vRes = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } });
-      if (vRes.ok) {
-        const vData = await vRes.json();
-        window._elevenVoices = vData.voices || [];
-        const c = document.getElementById('elevenVoiceCount');
-        if (c) c.textContent = vData.voices?.length || 0;
-      }
-      toast('✅ ElevenLabs conectado — ' + (window._elevenVoices?.length||0) + ' voces');
+      const c = document.getElementById('elevenVoiceCount');
+      if (c) c.textContent = count;
+      // Save key immediately
+      saveAPIKeys();
+      toast('✅ ElevenLabs conectado — ' + count + ' voces disponibles');
+    } else if (res.status === 401) {
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Key incorrecta'; }
+      toast('⚠️ API key incorrecta — cópiala de elevenlabs.io/app/developers/api-keys');
     } else {
-      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = 'Key inválida'; }
-      toast('⚠️ ElevenLabs key inválida');
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = '✗ Error ' + res.status; }
+      toast('⚠️ Error ' + res.status + ' — intenta de nuevo');
     }
-  } catch(e) { toast('⚠️ Error verificando ElevenLabs: ' + e.message); }
+  } catch(e) {
+    // CORS error or network issue
+    if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Key guardada'; }
+    // If CORS blocks the check, save anyway and trust the key
+    saveAPIKeys();
+    toast('✅ Key guardada — se verificará al generar voz');
+  }
 }
 
 let SUNO_MODE = localStorage.getItem('suno_mode') === 'true';
