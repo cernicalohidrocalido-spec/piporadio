@@ -2067,7 +2067,7 @@ function makeNoiseBuf(offCtx, dur, sr) {
 
 // ── Utility: create impulse response for convolution reverb ──
 function makeIR(offCtx, decaySec, sr, diffusion = 0.85) {
-  const len = Math.ceil(sr * decaySec);
+  const len = Math.ceil(sr * Math.min(decaySec, 0.8)); // cap reverb IR at 0.8s for performance
   const ir = offCtx.createBuffer(2, len, sr);
   for (let c = 0; c < 2; c++) {
     const d = ir.getChannelData(c);
@@ -4477,22 +4477,29 @@ async function generateSong() {
       return; // Exit early, skip local synthesis
     }
 
-    addLog('Sintetizando stems a 44.1kHz...');
-    addLog('  → Stem: Instrumentos principales ('+( (style.desc||orchStyle).split('—')[0].trim() )+')');
-    const stemInst   = await synthStem(ctx, durVal, bpm, keyVal, orchStyle, 'inst');
-    await sleep(100);
+    addLog('🎵 Sintetizando stems...');
+    
+    // Generate stems with individual error handling
+    const makeStem = async (type, label) => {
+      addLog('  → ' + label);
+      try {
+        const buf = await synthStem(ctx, durVal, bpm, keyVal, orchStyle, type);
+        addLog('    ✓ ' + label);
+        return buf;
+      } catch(e) {
+        addLog('    ⚠️ ' + label + ' falló: ' + e.message);
+        return null;
+      }
+    };
 
-    addLog('  → Stem: Acompañamiento armónico');
-    const stemAccomp = await synthStem(ctx, durVal, bpm, keyVal, orchStyle, 'accomp');
-    await sleep(100);
-
-    addLog('  → Stem: Ritmo — '+( (style.desc||'').split('—')[1]?.trim() || orchToGenre(orchStyle)+' percussion' ));
-    const stemDrums  = await synthStem(ctx, durVal, bpm, keyVal, orchStyle, 'drums');
-    await sleep(100);
-
-    addLog('  → Stem: Voz sintetizada (síntesis formántica)');
-    const stemVocal  = await synthVoice(ctx, durVal, bpm, keyVal, orchStyle, lyrics);
-    await sleep(100);
+    const stemInst   = await makeStem('inst',   'Instrumentos (' + orchToGenre(orchStyle) + ')');
+    const stemAccomp = await makeStem('accomp', 'Acompañamiento armónico');
+    const stemDrums  = await makeStem('drums',  'Ritmo / Percusión');
+    const stemVocal  = await makeStem('vocal',  'Voz sintetizada');
+    
+    if (!stemInst && !stemAccomp && !stemDrums) {
+      throw new Error('No se pudo generar ningún stem. Intenta con duración más corta (30 seg).');
+    }
 
     // ── STEP 3: Orquestación y mezcla ──
     setStep(3); addLog('Mezclando stems con cadena de masterización...');
