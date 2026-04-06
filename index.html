@@ -2835,10 +2835,49 @@ function playSong(idx){
   S.currentIdx=idx;
   const song=S.songs[idx];
   stopPlayback();
-  if(song.buffer) playBuffer(song.buffer);
-  else{ synthStem(getCtx(),song.duration||90,song.bpm||120,song.key||'C maj',song.genre||'pop','inst').then(b=>{song.buffer=b;playBuffer(b);}); }
+  if(song.isExternalUrl && song.audioUrl) {
+    // Suno MP3 — play via HTML audio element
+    playExternalUrl(song.audioUrl);
+  } else if(song.buffer) {
+    playBuffer(song.buffer);
+  } else if(song.audioUrl) {
+    // Try loading and playing the URL
+    playExternalUrl(song.audioUrl);
+  } else {
+    synthStem(getCtx(),song.duration||90,song.bpm||120,song.key||'C maj',song.genre||'pop','inst').then(b=>{song.buffer=b;playBuffer(b);});
+  }
   updatePlayerUI(song);
   updateCards();
+}
+
+function playExternalUrl(url) {
+  // Use a hidden audio element for external MP3 URLs
+  let audioEl = document.getElementById('_externalAudio');
+  if (!audioEl) {
+    audioEl = document.createElement('audio');
+    audioEl.id = '_externalAudio';
+    audioEl.style.display = 'none';
+    document.body.appendChild(audioEl);
+  }
+  audioEl.src = url;
+  audioEl.currentTime = 0;
+  audioEl.play().catch(e => console.warn('External audio play failed:', e));
+  S.playing = true;
+  updatePP();
+  // Update progress bar
+  audioEl.ontimeupdate = () => {
+    const pct = audioEl.duration ? audioEl.currentTime / audioEl.duration : 0;
+    const el = document.getElementById('seekBar');
+    if (el) el.value = pct * 100;
+    const cur = document.getElementById('curTime');
+    if (cur) {
+      const s = Math.floor(audioEl.currentTime);
+      cur.textContent = Math.floor(s/60)+':'+ String(s%60).padStart(2,'0');
+    }
+  };
+  audioEl.onended = () => { S.playing = false; updatePP(); };
+  // Override stopPlayback for external audio
+  S._externalAudio = audioEl;
 }
 
 function playBuffer(buf){
@@ -2863,6 +2902,7 @@ function playBuffer(buf){
 }
 
 function stopPlayback(){
+  if(S._externalAudio){try{S._externalAudio.pause();S._externalAudio.currentTime=0;}catch(e){}}
   if(S.source){try{S.source.stop();}catch(e){}} S.source=null;
   S.playing=false; S.offset=0;
   cancelAnimationFrame(S.playerAnim);
@@ -2871,6 +2911,12 @@ function stopPlayback(){
 function togglePlay(){
   if(!S.songs.length) return;
   if(S.currentIdx===-1){playSong(0);return;}
+  // Handle external URL audio (Suno MP3)
+  if(S._externalAudio && S._externalAudio.src) {
+    if(S.playing) { S._externalAudio.pause(); S.playing=false; }
+    else { S._externalAudio.play(); S.playing=true; }
+    updatePP(); return;
+  }
   const ctx=getCtx();
   if(S.playing){
     S.offset=ctx.currentTime-S.startTime;
@@ -3719,7 +3765,7 @@ async function genLyrics(){
   const usr=`Escribe letra completa para:\nGénero: ${genre}\nMood: ${mood}\nBPM: ${bpm}\nTonalidad: ${key}\nDescripción: ${prompt||'canción emotiva'}\n${existing?'Referencia:\n'+existing.slice(0,200):''}`;
 
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch(window.location.hostname==='localhost'?'https://api.anthropic.com/v1/messages':'/api/proxy?service=anthropic&path=%2Fv1%2Fmessages',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:usr}]})
     });
@@ -5919,11 +5965,23 @@ async function _downloadDecode(url, name) {
   const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
   addLog('📥 Descargando: ' + url.substring(0, 60) + '...');
   try {
-    const ab = await (await fetch(url)).arrayBuffer();
-    addLog('🔊 Decodificando ' + Math.round(ab.byteLength/1024) + ' KB...');
-    const buffer = await getCtx().decodeAudioData(ab);
-    addLog('✅ Listo — ' + Math.round(buffer.duration) + 's de audio real');
-    return { buffer, name, sunoClipId: null };
+    // First try direct decodeAudioData (works for WAV, some MP3s)
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const ab = await resp.arrayBuffer();
+    addLog('🔊 Procesando ' + Math.round(ab.byteLength/1024) + ' KB...');
+    
+    try {
+      const buffer = await getCtx().decodeAudioData(ab.slice(0)); // slice to clone
+      addLog('✅ Listo — ' + Math.round(buffer.duration) + 's de audio real');
+      return { buffer, name, sunoClipId: null, audioUrl: url };
+    } catch(decodeErr) {
+      // MP3 decode failed — use URL directly as audio element source
+      addLog('🎵 Usando reproductor nativo para MP3...');
+      // Create a fake AudioBuffer-like object with the URL for playback
+      // Store the URL so the player can use it as <audio src>
+      return { buffer: null, audioUrl: url, name, sunoClipId: null, isExternalUrl: true };
+    }
   } catch(e) {
     addLog('⚠️ Error descargando: ' + e.message);
     throw new Error('No se pudo descargar el audio: ' + e.message);
@@ -5934,24 +5992,24 @@ async function _downloadDecode(url, name) {
 function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
   // Ultra-precise style descriptions for udioapi.pro / Suno V4.5+
   const styleMap = {
-    grupero:      'grupero norteño mexicano, acordeón diatónico fa/sib con adornos, bajo sexto percutido, tololoche profundo, batería norteña seca, coros gruperos',
-    temerarios:   'balada grupera romántica mexicana, piano Rhodes cálido, sintetizadores pad suaves en capas, cuerdas sintetizadas, bajo eléctrico suave, batería con escobillas',
-    norteno:      'norteño corrido mexicano, acordeón norteño con corridas, tuba profunda, bajo sexto, batería norteña, estilo norteño auténtico',
-    ranchera:     'ranchera mariachi mexicana tradicional, trompetas mariachi brillantes, violines jalicienses emotivos, vihuela rítmica, guitarrón profundo, mariachi en vivo',
-    cumbia:       'cumbia tropical colombo-mexicana, acordeón diatónico tropical, caja vallenata, guacharaca, bajo eléctrico funky, maracas, tropical festivo bailable',
-    tropicalisimo:'tropical caliente mexicano estilo Tropicalisimo Apache, órgano Farfisa vintage, bajo eléctrico funky prominente, congas, maracas, trompeta limpia',
-    samuray:      'quebradita norteña mexicana energética, acordeón con corridas rápidas, tambora de banda, bajo eléctrico, ritmo quebradita 140+ BPM, festivo bravío',
-    banda:        'banda sinaloense mexicana, tuba profunda, trombones, clarinetes, percusión de banda, vientos potentes, estilo sinaloense auténtico',
-    bachata:      'bachata dominicana sensual, guitarra bachata requinto melódico, bongós, güira, bajo eléctrico, romántico tropical',
-    salsa:        'salsa latina tropical, piano montuno cubano, congas y timbales, trompetas de salsa, bajo eléctrico, son cubano clave 2-3',
-    bolero:       'bolero orquestal romántico latino, piano de cola Steinway, cuerdas orquestales opulentas, contrabajo, producción lujosa',
-    reggaeton:    'reggaeton urbano latino moderno, 808 bass profundo, dembow ritmo, sintetizadores, trap latino',
-    pop:          'pop latino internacional, sintetizadores modernos, batería electrónica con kick potente, bajo sintetizado, producción brillante comercial',
-    rock:         'rock alternativo en español, guitarras eléctricas con overdrive, bajo potente, batería agresiva, energía rock',
-    electronic:   'electrónica synthwave, sintetizadores vintage analógicos, drum machine, arpegios, atmósfera electrónica',
-    jazz:         'jazz estándar, piano jazz, contrabajo pizzicato, batería con escobillas swing, trompeta en sordina, feel jazz auténtico',
-    lofi:         'lo-fi hip-hop chill, piano jazz sampleado con vinyl crackle, batería swing lo-fi, bajo woofer suave, nostálgico relajante',
-    folk:         'folk acústico, guitarra acústica fingerpicking, violines emotivos, contrabajo acústico, producción orgánica natural',
+    grupero:      'mexican grupero norteno, diatonic accordion with ornaments, bajo sexto percussive, tololoche bass, dry norteño drums, group vocals, emotional romantic',
+    temerarios:   'mexican romantic ballad grupero, warm Rhodes piano, soft synthesizer pads layered, synthesized strings, soft electric bass, brush drums, sentimental',
+    norteno:      'mexican norteno corrido, norteño accordion with runs, deep tuba, bajo sexto, norteña drums, authentic norteno style',
+    ranchera:     'traditional mexican ranchera mariachi, bright mariachi trumpets, emotional violins, rhythmic vihuela, deep guitarrón, live mariachi feel',
+    cumbia:       'colombian mexican cumbia tropical, tropical diatonic accordion, vallenata drum, guacharaca, funky electric bass, maracas, festive danceable',
+    tropicalisimo:'hot mexican tropical, vintage Farfisa organ, prominent funky electric bass, congas, maracas, clean trumpet, festive',
+    samuray:      'energetic mexican quebradita nortena, fast accordion runs, banda tambora, electric bass, quebradita rhythm 140 BPM, festive',
+    banda:        'sinaloan banda sinaloense, deep tuba, trombones, clarinets, banda percussion, powerful brass section, authentic sinaloan',
+    bachata:      'sensual dominican bachata, melodic requinto guitar, bongos, guira, electric bass, romantic tropical',
+    salsa:        'latin tropical salsa, cuban montuno piano, congas and timbales, salsa trumpets, electric bass, cuban son clave 2-3',
+    bolero:       'orchestral romantic latin bolero, grand piano, opulent orchestral strings, double bass, luxurious production',
+    reggaeton:    'urban latin reggaeton modern, deep 808 bass, dembow rhythm, synthesizers, latin trap',
+    pop:          'latin pop international, modern synthesizers, electronic drums powerful kick, synthesized bass, brilliant commercial production',
+    rock:         'alternative rock spanish, electric guitars with overdrive, powerful bass, aggressive drums, rock energy',
+    electronic:   'synthwave electronic, vintage analog synthesizers, drum machine, arpeggios, electronic atmosphere',
+    jazz:         'standard jazz, jazz piano, pizzicato double bass, swing brush drums, muted trumpet, authentic jazz feel',
+    lofi:         'lo-fi hip hop chill, vinyl crackle jazz piano sample, lo-fi swing drums, soft woofer bass, nostalgic relaxing',
+    folk:         'acoustic folk, fingerpicking acoustic guitar, emotional violins, acoustic double bass, organic natural production',
   };
 
   const styleDesc = styleMap[orchStyle] || orchStyle;
@@ -5963,7 +6021,15 @@ function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
   if (vocalDesc) parts.push(vocalDesc);
   if (userPrompt?.length > 10) parts.push(userPrompt.substring(0,200));
 
-  return parts.join(', ');
+  const raw = parts.join(', ');
+  // Suno policy: strip any artist/band names to avoid rejection
+  // Remove common patterns that trigger the "artist name" error
+  const sanitized = raw
+    .replace(/estilo\s+[A-ZÁÉÍÓÚ][a-záéíóú]+\s+[A-ZÁÉÍÓÚ][a-záéíóú]+/g, '')  // "estilo Nombre Apellido"
+    .replace(/\b(liberaci[oó]n|acosta|temerarios|samuray|tropicalisimo|chucos|fernández|fernandez|miguel|antonio|aguilar)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return sanitized;
 }
 
 async function generateVoiceWithElevenLabs(text, orchStyle) {
