@@ -1415,46 +1415,34 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
         <span class="api-tier-badge">⭐ ACTIVO</span>
       </div>
 
-      <!-- Step 1: Cookie -->
-      <div style="background:var(--bg3);border:1px solid rgba(212,175,55,.18);border-radius:var(--rs);padding:12px;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px">① Obtener tu Cookie de Suno</div>
-        <div style="font-size:11.5px;color:var(--txt2);line-height:1.75;margin-bottom:8px">
-          1. Ve a <a href="https://suno.com/create" target="_blank" style="color:var(--gold2)">suno.com/create</a> en Chrome<br>
-          2. Presiona <strong style="color:var(--txt)">F12</strong> → pestaña <strong style="color:var(--txt)">Network</strong><br>
-          3. Recarga la página (F5)<br>
-          4. Busca una petición con <strong style="color:var(--txt)">__clerk_api_version</strong><br>
-          5. Clic en ella → Headers → copia el valor de <strong style="color:var(--txt)">Cookie</strong>
-        </div>
-        <div class="ig" style="margin-bottom:0">
-          <div class="lbl">Cookie de Suno (larga cadena)</div>
-          <textarea class="inp" id="sunoCookie" rows="3" placeholder="__client=...; __session=...; _cfuvid=..." style="font-size:10px;font-family:var(--fm);resize:vertical" oninput="checkAPIStatus('suno',this.value)"></textarea>
+      <div style="background:linear-gradient(135deg,rgba(212,175,55,.08),rgba(245,158,11,.04));border:1px solid rgba(212,175,55,.2);border-radius:var(--rs);padding:12px;margin-bottom:12px;font-size:11.5px;color:var(--txt2);line-height:1.8">
+        🎵 Genera música real con <strong style="color:var(--gold)">Suno V4.5 / V5</strong> y <strong style="color:var(--gold)">Udio</strong> — calidad de estudio profesional.<br>
+        Obtén tu API key gratis en <a href="https://udioapi.pro/dashboard" target="_blank" style="color:var(--gold2);font-weight:700">udioapi.pro/dashboard</a>
+      </div>
+
+      <div class="ig">
+        <div class="lbl">udioapi.pro API Key</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="sunoKey" type="password" placeholder="sk-..." style="flex:1;font-family:var(--fm)" oninput="checkAPIStatus('suno',this.value)">
+          <button class="btn btn-green" onclick="testSunoKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
         </div>
       </div>
 
-      <!-- Step 2: Vercel URL -->
-      <div style="background:var(--bg3);border:1px solid rgba(212,175,55,.18);border-radius:var(--rs);padding:12px;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px">② Desplegar suno-api en Vercel (gratis)</div>
-        <div style="font-size:11.5px;color:var(--txt2);line-height:1.75;margin-bottom:8px">
-          1. Clic en el botón azul de abajo<br>
-          2. En Vercel: pon tu Cookie en <strong style="color:var(--txt)">SUNO_COOKIE</strong><br>
-          3. Despliega y copia la URL que te da Vercel<br>
-          4. Pégala aquí abajo
-        </div>
-        <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgcui-art%2Fsuno-api&env=SUNO_COOKIE,TWOCAPTCHA_KEY,BROWSER,BROWSER_GHOST_CURSOR,BROWSER_LOCALE,BROWSER_HEADLESS&project-name=suno-api&repository-name=suno-api"
-           target="_blank"
-           style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#0070f3;color:#fff;border-radius:var(--rs);font-size:12px;font-weight:700;text-decoration:none;margin-bottom:10px">
-          ▲ Deploy to Vercel — gratis en 3 min
-        </a>
-        <div class="ig" style="margin-bottom:0">
-          <div class="lbl">URL de tu suno-api en Vercel</div>
-          <div style="display:flex;gap:8px">
-            <input class="inp" id="sunoKey" type="text" placeholder="https://suno-api-xxxx.vercel.app" style="flex:1;font-family:var(--fm);font-size:12px" oninput="checkAPIStatus('suno',this.value)">
-            <button class="btn btn-green" onclick="testSunoKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
-          </div>
-        </div>
+      <div class="ig" style="margin-bottom:12px">
+        <div class="lbl">Modelo de IA</div>
+        <select class="inp" id="sunoModel">
+          <option value="chirp-v4-5">Suno V4.5 — Mejor calidad (recomendado)</option>
+          <option value="chirp-v5">Suno V5 — Máxima calidad</option>
+          <option value="chirp-v4-0">Suno V4 — Estándar</option>
+        </select>
       </div>
 
       <div class="tog" id="tog-suno-enabled">
+        <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar udioapi.pro para generación (audio real)</div>
+        <div class="sw" id="sw-suno" onclick="toggleSunoMode(this)"></div>
+      </div>
+    </div>
+
         <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar Suno para generación (audio profesional real)</div>
         <div class="sw" id="sw-suno" onclick="toggleSunoMode(this)"></div>
       </div>
