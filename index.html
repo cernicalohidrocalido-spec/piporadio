@@ -2,7 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PipoRadio">
+<meta name="description" content="Estudio musical IA — genera canciones con calidad profesional en tu navegador">
+<meta property="og:title" content="PipoRadio — AI Music Studio">
+<meta property="og:description" content="Genera canciones con calidad de estudio directamente en tu navegador">
+<meta property="og:type" content="website">
+<link rel="manifest" id="pwa-manifest">
 <title>PipoRadio — AI Music Studio Pro</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" crossorigin="anonymous"></script>
@@ -434,6 +443,25 @@ body::after{content:'';position:fixed;inset:0;background:url("data:image/svg+xml
 .api-banner strong{color:var(--nd);display:block;margin-bottom:4px;font-size:13px}
 .api-banner a{color:var(--nc);text-decoration:none}
 .api-banner a:hover{text-decoration:underline}
+
+/* ── API Status Dashboard ── */
+.api-status-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;text-align:center;cursor:pointer;transition:all .2s}
+.api-status-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.api-status-icon{font-size:22px;margin-bottom:5px}
+.api-status-name{font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px}
+.api-status-badge{padding:2px 8px;border-radius:99px;font-size:9.5px;font-weight:700;display:inline-block}
+.api-status-badge.off{background:rgba(255,255,255,.06);color:var(--txt3)}
+.api-status-badge.on{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:var(--nd)}
+.api-status-badge.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:#ef4444}
+.api-tier-badge{margin-left:auto;padding:2px 8px;border-radius:99px;font-size:9px;font-weight:700;background:rgba(212,175,55,.15);color:var(--gold);border:1px solid rgba(212,175,55,.25);text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Suno generation mode indicator ── */
+.suno-active-badge{display:none;padding:5px 12px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);border-radius:99px;font-size:11px;color:var(--gold2);font-weight:600;align-items:center;gap:6px}
+.suno-active-badge.on{display:inline-flex}
+
+/* ── Share/install ── */
+.install-btn{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(6,182,212,.1));border:1px solid rgba(16,185,129,.25);border-radius:var(--rs);padding:9px 14px;color:var(--nd);font-family:var(--fb);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px;width:100%;justify-content:center;margin-top:8px}
+.install-btn:hover{background:linear-gradient(135deg,rgba(16,185,129,.25),rgba(6,182,212,.18))}
 
 /* ── Auto-Prompt Builder ── */
 .apb-panel{background:linear-gradient(135deg,rgba(212,175,55,.06),rgba(212,175,55,.02));border:1px solid rgba(212,175,55,.2);border-radius:14px;padding:16px;margin-bottom:14px}
@@ -1346,40 +1374,144 @@ Ej: 'Balada de pop rock con piano suave, guitarras limpias con delay, bajo groov
 
 <!-- SETTINGS -->
 <div class="page" id="page-settings">
-  <div class="sec-hdr"><div class="sec-title">Ajustes & API</div></div>
-  <div style="max-width:520px">
-    <div class="card" style="margin-bottom:14px">
-      <div class="card-title"><i class="fas fa-key"></i> Configuración de APIs</div>
-      <div class="api-banner">
-        <strong>🤖 Anthropic Claude API</strong>
-        Necesaria para generación de letras con IA. <a href="https://console.anthropic.com/" target="_blank">Obtener API key →</a>
+  <div class="sec-hdr">
+    <div><div class="sec-title">Ajustes & API</div><div class="sec-sub">Conecta servicios externos para máxima calidad</div></div>
+  </div>
+  <div style="max-width:680px">
+
+    <!-- API STATUS DASHBOARD -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:18px" id="apiStatusGrid">
+      <div class="api-status-card" id="status-anthropic" onclick="nav('settings');document.getElementById('anthropicKey').focus()">
+        <div class="api-status-icon">🤖</div>
+        <div class="api-status-name">Claude AI</div>
+        <div class="api-status-badge off" id="badge-anthropic">Sin configurar</div>
       </div>
-      <div class="ig"><div class="lbl">Anthropic API Key</div><input class="inp" id="anthropicKey" type="password" placeholder="sk-ant-..."></div>
-      <div class="api-banner" style="margin-top:12px">
-        <strong>🎛️ Moises.ai API (Separación de Stems)</strong>
-        Para separar voz, batería, guitarra y bajo de cualquier audio. <a href="https://moises.ai/es/api/" target="_blank">Obtener API key →</a>
+      <div class="api-status-card" id="status-suno" onclick="nav('settings');document.getElementById('sunoKey').focus()">
+        <div class="api-status-icon">🎵</div>
+        <div class="api-status-name">Suno</div>
+        <div class="api-status-badge off" id="badge-suno">Sin configurar</div>
       </div>
-      <div class="ig"><div class="lbl">Moises.ai API Key</div><input class="inp" id="moisesKey" type="password" placeholder="..."></div>
-      <div class="api-banner" style="margin-top:12px">
-        <strong>🎚️ Dolby.io Audio (Masterización)</strong>
-        Masterización automática con calidad profesional. <a href="https://dolby.io/" target="_blank">Obtener API key →</a>
+      <div class="api-status-card" id="status-eleven" onclick="nav('settings');document.getElementById('elevenKey').focus()">
+        <div class="api-status-icon">🎤</div>
+        <div class="api-status-name">ElevenLabs</div>
+        <div class="api-status-badge off" id="badge-eleven">Sin configurar</div>
       </div>
-      <div class="ig"><div class="lbl">Dolby.io App Key</div><input class="inp" id="dolbyKey" type="password" placeholder="..."></div>
-      <button class="btn-pri" onclick="saveAPIKeys()"><i class="fas fa-floppy-disk"></i> Guardar configuración</button>
+      <div class="api-status-card" id="status-moises" onclick="nav('settings');document.getElementById('moisesKey').focus()">
+        <div class="api-status-icon">🎚️</div>
+        <div class="api-status-name">Moises.ai</div>
+        <div class="api-status-badge off" id="badge-moises">Sin configurar</div>
+      </div>
+      <div class="api-status-card" id="status-backend">
+        <div class="api-status-icon">🖥️</div>
+        <div class="api-status-name">Backend</div>
+        <div class="api-status-badge off" id="badge-backend">Offline</div>
+      </div>
     </div>
 
+    <!-- SUNO API — Generación de música real -->
+    <div class="card" style="margin-bottom:14px;border-color:rgba(212,175,55,.25)">
+      <div class="card-title"><i class="fas fa-music" style="color:var(--gold)"></i> Suno API — Música de calidad profesional real
+        <span class="api-tier-badge">⭐ Recomendado</span>
+      </div>
+      <div class="api-banner" style="background:linear-gradient(135deg,rgba(212,175,55,.1),rgba(245,158,11,.06));border-color:rgba(212,175,55,.25)">
+        <strong style="color:var(--gold)">🎵 Suno — Audio profesional real</strong>
+        Con tu API key, PipoRadio enviará el prompt generado a Suno y recibirás audio de calidad de estudio real en lugar de síntesis local.
+        <a href="https://suno.com/api" target="_blank" style="color:var(--gold2)">Obtener acceso API →</a>
+      </div>
+      <div class="ig">
+        <div class="lbl">Suno API Key</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="sunoKey" type="password" placeholder="suno-..." style="flex:1" oninput="checkAPIStatus('suno',this.value)">
+          <button class="btn btn-green" onclick="testSunoKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
+        </div>
+      </div>
+      <div class="tog" id="tog-suno-enabled">
+        <div class="tog-lbl"><i class="fas fa-wand-magic-sparkles" style="color:var(--gold)"></i> Usar Suno para generación (en lugar de síntesis local)</div>
+        <div class="sw" id="sw-suno" onclick="toggleSunoMode(this)"></div>
+      </div>
+    </div>
+
+    <!-- ELEVENLABS — Clonación de voz real -->
+    <div class="card" style="margin-bottom:14px;border-color:rgba(236,72,153,.2)">
+      <div class="card-title"><i class="fas fa-microphone" style="color:var(--nf)"></i> ElevenLabs — Clonación de voz profesional</div>
+      <div class="api-banner" style="background:rgba(236,72,153,.06);border-color:rgba(236,72,153,.2)">
+        <strong style="color:var(--nf)">🎤 ElevenLabs Voice Cloning</strong>
+        Clona tu voz real con 30 segundos de muestra. PipoRadio usará tu clon para cantar las letras generadas.
+        Plan gratuito: 10,000 caracteres/mes. <a href="https://elevenlabs.io" target="_blank" style="color:var(--nf)">Registrarse gratis →</a>
+      </div>
+      <div class="ig">
+        <div class="lbl">ElevenLabs API Key</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="elevenKey" type="password" placeholder="sk_..." style="flex:1" oninput="checkAPIStatus('eleven',this.value)">
+          <button class="btn btn-pink" onclick="testElevenKey()" style="white-space:nowrap"><i class="fas fa-plug"></i> Probar</button>
+        </div>
+      </div>
+      <div id="elevenVoiceInfo" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(236,72,153,.08);border:1px solid rgba(236,72,153,.2);border-radius:var(--rs);font-size:11.5px;color:var(--txt2)">
+        Voces disponibles: <span id="elevenVoiceCount">—</span> · Caracteres restantes: <span id="elevenCharsLeft">—</span>
+      </div>
+    </div>
+
+    <!-- ANTHROPIC -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title"><i class="fas fa-robot"></i> Anthropic Claude — Letras con IA</div>
+      <div class="api-banner">
+        <strong>🤖 Claude API</strong>
+        Genera letras contextualizadas al género, mood e instrumentación detectada.
+        <a href="https://console.anthropic.com/" target="_blank">Obtener API key →</a>
+      </div>
+      <div class="ig"><div class="lbl">Anthropic API Key</div>
+        <input class="inp" id="anthropicKey" type="password" placeholder="sk-ant-..." oninput="checkAPIStatus('anthropic',this.value)">
+      </div>
+    </div>
+
+    <!-- MOISES + DOLBY -->
+    <div class="two-col" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-code-branch"></i> Moises.ai — Stems</div>
+        <div style="font-size:11px;color:var(--txt2);margin-bottom:10px;line-height:1.6">Separación real de vocals, drums, bass, other con IA.</div>
+        <div class="ig"><div class="lbl">API Key</div>
+          <input class="inp" id="moisesKey" type="password" placeholder="..." oninput="checkAPIStatus('moises',this.value)">
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-sliders"></i> Dolby.io — Master</div>
+        <div style="font-size:11px;color:var(--txt2);margin-bottom:10px;line-height:1.6">Masterización automática con calidad broadcast.</div>
+        <div class="ig"><div class="lbl">App Key</div>
+          <input class="inp" id="dolbyKey" type="password" placeholder="...">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-pri btn-full" onclick="saveAPIKeys()" style="margin-bottom:18px">
+      <i class="fas fa-floppy-disk"></i> Guardar configuración
+    </button>
+
+    <!-- AUDIO SETTINGS -->
     <div class="card" style="margin-bottom:14px">
       <div class="card-title"><i class="fas fa-sliders"></i> Audio</div>
-      <div class="tog"><div class="tog-lbl"><i class="fas fa-microchip"></i> Audio 48kHz / 24-bit (estudio)</div><div class="sw on" id="sw-hq"></div></div>
+      <div class="tog"><div class="tog-lbl"><i class="fas fa-microchip"></i> Audio alta calidad (estudio)</div><div class="sw on" id="sw-hq"></div></div>
       <div class="tog"><div class="tog-lbl"><i class="fas fa-wave-square"></i> Web Worker para síntesis</div><div class="sw on" id="sw-ww"></div></div>
       <div class="tog"><div class="tog-lbl"><i class="fas fa-floppy-disk"></i> Guardar automáticamente</div><div class="sw on" id="sw-autosave"></div></div>
     </div>
 
-    <div class="card">
+    <!-- GENERAL -->
+    <div class="card" style="margin-bottom:14px">
       <div class="card-title"><i class="fas fa-gear"></i> General</div>
       <div class="tog" onclick="this.querySelector('.sw').classList.toggle('on')"><div class="tog-lbl"><i class="fas fa-moon"></i> Modo oscuro</div><div class="sw on"></div></div>
       <div class="tog" onclick="this.querySelector('.sw').classList.toggle('on')"><div class="tog-lbl"><i class="fas fa-bell"></i> Notificaciones</div><div class="sw on"></div></div>
+      <div class="tog" id="tog-pwa" style="cursor:pointer" onclick="installPWA()">
+        <div class="tog-lbl"><i class="fas fa-mobile-alt"></i> Instalar como app en este dispositivo</div>
+        <div class="btn" style="padding:4px 10px;font-size:10px">Instalar</div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:var(--rs);font-size:11px;color:var(--txt3)">
+        <strong style="color:var(--txt2);display:block;margin-bottom:4px">🔗 Compartir esta app</strong>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input class="inp" id="shareUrl" value="https://cernicalohidrocalido-spec.github.io/piporadio/" readonly style="font-size:10.5px;font-family:var(--fm)">
+          <button class="btn" onclick="copyShareUrl()" style="white-space:nowrap;font-size:11px"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+      </div>
     </div>
+
   </div>
 
 <!-- ══ BACKEND ARCHITECTURE PANEL ══ (in settings page) -->
@@ -1643,24 +1775,29 @@ function loadLS(){
   try{ const r=JSON.parse(localStorage.getItem('pr_songs')||'[]'); S.songs=r; refreshUI(); }catch(e){}
 }
 function saveAPIKeys(){
+  const get = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
   const keys = {
-    anthropic: document.getElementById('anthropicKey').value,
-    moises: document.getElementById('moisesKey').value,
-    dolby: document.getElementById('dolbyKey').value,
+    anthropic: get('anthropicKey'), suno: get('sunoKey'),
+    eleven: get('elevenKey'), moises: get('moisesKey'), dolby: get('dolbyKey'),
   };
   localStorage.setItem('pr_apikeys', JSON.stringify(keys));
   if(db){
     const tx=db.transaction('settings','readwrite');
     Object.entries(keys).forEach(([k,v]) => tx.objectStore('settings').put({k,v}));
   }
+  Object.keys(keys).forEach(k => checkAPIStatus(k, keys[k]));
   toast('✅ Configuración guardada');
 }
 function loadAPIKeys(){
   try{
     const keys = JSON.parse(localStorage.getItem('pr_apikeys')||'{}');
-    if(keys.anthropic) document.getElementById('anthropicKey').value=keys.anthropic;
-    if(keys.moises) document.getElementById('moisesKey').value=keys.moises;
-    if(keys.dolby) document.getElementById('dolbyKey').value=keys.dolby;
+    const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
+    set('anthropicKey',keys.anthropic); set('sunoKey',keys.suno);
+    set('elevenKey',keys.eleven); set('moisesKey',keys.moises); set('dolbyKey',keys.dolby);
+    Object.entries(keys).forEach(([k,v]) => checkAPIStatus(k, v));
+    SUNO_MODE = localStorage.getItem('suno_mode')==='true';
+    const sw=document.getElementById('sw-suno');
+    if(sw) sw.classList.toggle('on', SUNO_MODE);
   }catch(e){}
 }
 function getAPIKey(k){
@@ -4494,10 +4631,33 @@ async function generateSong() {
     if (S.recBuffer||(typeof vsRecBuffer!=='undefined'&&vsRecBuffer)) addLog('Muestra de voz disponible: '+( document.getElementById('vsClassVal')?.textContent||'grabada'));
     await sleep(300);
 
-    // ── STEP 2: Síntesis de stems ──
-    setStep(2); addLog('Sintetizando stems a 48kHz...');
+    // ── STEP 2: Síntesis ──
+    setStep(2);
     const ctx = getCtx();
 
+    // Use Suno if mode active and key configured
+    if (SUNO_MODE && getAPIKey('suno')) {
+      addLog('🎵 Usando Suno API — generando audio profesional real...');
+      const sunoResult = await generateWithSuno(prompt, orchStyle, bpm, keyVal, durVal);
+      setStep(3); setStep(4); setStep(5);
+      addLog('✅ Audio Suno recibido: ' + sunoResult.name);
+      const song = {
+        id: Date.now(), name: sunoResult.name || nameVal || genName(),
+        genre: orchToGenre(orchStyle), orchStyle, bpm, key: keyVal, duration: durVal,
+        prompt, lyrics, artSeed: Math.random()*10000|0,
+        buffer: sunoResult.buffer, stemBuffers: null,
+        dna: S_DNA.ref ? {...S_DNA} : null, createdAt: new Date().toISOString(),
+        source: 'suno', sunoClipId: sunoResult.sunoClipId,
+      };
+      S.songs.unshift(song); saveDB(song); saveLS();
+      refreshUI(); refreshSidebarLib();
+      clearTimeout(_genTimeout);
+      setTimeout(() => playSong(0), 300);
+      toast('🎵 "'+song.name+'" generada con Suno — calidad profesional real');
+      return; // Exit early, skip local synthesis
+    }
+
+    addLog('Sintetizando stems a 44.1kHz...');
     addLog('  → Stem: Instrumentos principales ('+( (style.desc||orchStyle).split('—')[0].trim() )+')');
     const stemInst   = await synthStem(ctx, durVal, bpm, keyVal, orchStyle, 'inst');
     await sleep(100);
@@ -5241,8 +5401,221 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+// ═══════════════════════════════════════════════════════════
+// SUNO + ELEVENLABS + PWA INTEGRATION
+// ═══════════════════════════════════════════════════════════
+
+function checkAPIStatus(service, value) {
+  const badge = document.getElementById('badge-' + service);
+  if (!badge) return;
+  if (value && value.length > 8) {
+    badge.className = 'api-status-badge on';
+    badge.textContent = '✓ Configurado';
+  } else {
+    badge.className = 'api-status-badge off';
+    badge.textContent = 'Sin configurar';
+  }
+}
+
+async function testSunoKey() {
+  const key = document.getElementById('sunoKey')?.value?.trim();
+  if (!key) { toast('⚠️ Ingresa tu Suno API key primero'); return; }
+  toast('🔍 Verificando Suno API...');
+  try {
+    const res = await fetch('https://studio-api.suno.ai/api/billing/info/', {
+      headers: { 'Authorization': 'Bearer ' + key }
+    });
+    const badge = document.getElementById('badge-suno');
+    if (res.ok) {
+      const data = await res.json();
+      const credits = data?.total_credits_left || '?';
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ ' + credits + ' créditos'; }
+      toast('✅ Suno conectado — ' + credits + ' créditos');
+    } else {
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = 'Key inválida'; }
+      toast('⚠️ Suno key inválida (status ' + res.status + ')');
+    }
+  } catch(e) { toast('⚠️ Error verificando Suno: ' + e.message); }
+}
+
+async function testElevenKey() {
+  const key = document.getElementById('elevenKey')?.value?.trim();
+  if (!key) { toast('⚠️ Ingresa tu ElevenLabs API key primero'); return; }
+  toast('🔍 Verificando ElevenLabs...');
+  try {
+    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': key }
+    });
+    const badge = document.getElementById('badge-eleven');
+    if (res.ok) {
+      const data = await res.json();
+      if (badge) { badge.className = 'api-status-badge on'; badge.textContent = '✓ Conectado'; }
+      const infoEl = document.getElementById('elevenVoiceInfo');
+      if (infoEl) infoEl.style.display = 'block';
+      const vRes = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } });
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        window._elevenVoices = vData.voices || [];
+        const c = document.getElementById('elevenVoiceCount');
+        if (c) c.textContent = vData.voices?.length || 0;
+      }
+      toast('✅ ElevenLabs conectado — ' + (window._elevenVoices?.length||0) + ' voces');
+    } else {
+      if (badge) { badge.className = 'api-status-badge error'; badge.textContent = 'Key inválida'; }
+      toast('⚠️ ElevenLabs key inválida');
+    }
+  } catch(e) { toast('⚠️ Error verificando ElevenLabs: ' + e.message); }
+}
+
+let SUNO_MODE = localStorage.getItem('suno_mode') === 'true';
+
+function toggleSunoMode(sw) {
+  const key = getAPIKey('suno');
+  if (!key && !SUNO_MODE) { toast('⚠️ Primero guarda tu Suno API key'); return; }
+  SUNO_MODE = !SUNO_MODE;
+  sw.classList.toggle('on', SUNO_MODE);
+  localStorage.setItem('suno_mode', SUNO_MODE);
+  toast(SUNO_MODE ? '🎵 Modo Suno activado — audio profesional real' : '🔊 Modo síntesis local');
+  updateFusionBar();
+}
+
+async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
+  const sunoKey = getAPIKey('suno');
+  if (!sunoKey) throw new Error('No Suno API key');
+  const addLog = msg => { const l=document.getElementById('genLog'); if(l){l.innerHTML+='> '+msg+'<br>';l.scrollTop=l.scrollHeight;} };
+  const sunoPrompt = buildSunoPrompt(prompt, orchStyle, bpm, key_sig);
+  addLog('📝 Prompt Suno: ' + sunoPrompt.substring(0,80)+'...');
+  const genRes = await fetch('https://studio-api.suno.ai/api/generate/v2/', {
+    method:'POST',
+    headers:{'Authorization':'Bearer '+sunoKey,'Content-Type':'application/json'},
+    body: JSON.stringify({
+      prompt: sunoPrompt, mv: 'chirp-v4',
+      title: document.getElementById('songName')?.value||'PipoRadio Song',
+      tags: orchStyle,
+      make_instrumental: document.getElementById('lm-none')?.classList.contains('on'),
+      wait_audio: false,
+    })
+  });
+  if (!genRes.ok) throw new Error('Suno error ' + genRes.status + ': ' + await genRes.text().then(t=>t.substring(0,80)));
+  const genData = await genRes.json();
+  const clips = genData.clips||[];
+  if (!clips.length) throw new Error('No clips from Suno');
+  const clipId = clips[0].id;
+  addLog('⏳ Generando (ID: '+clipId+')...');
+  for (let i=0; i<60; i++) {
+    await sleep(3000);
+    addLog('⏳ Esperando audio de Suno... ('+(i*3)+'s)');
+    const pollRes = await fetch('https://studio-api.suno.ai/api/feed/?ids='+clipId, {
+      headers:{'Authorization':'Bearer '+sunoKey}
+    });
+    if (!pollRes.ok) continue;
+    const pollData = await pollRes.json();
+    const clip = (pollData.clips||pollData)[0];
+    if (clip?.status==='complete' && clip?.audio_url) {
+      addLog('✅ Audio Suno listo: '+clip.title);
+      const ab = await (await fetch(clip.audio_url)).arrayBuffer();
+      const buf = await getCtx().decodeAudioData(ab);
+      return { buffer:buf, name:clip.title||'Suno Song', sunoClipId:clipId };
+    }
+    if (clip?.status==='error') throw new Error('Suno falló: '+(clip.error_message||'error'));
+  }
+  throw new Error('Suno timeout');
+}
+
+function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
+  const styleMap = {
+    grupero:'grupero norteño, acordeón norteño, bajo sexto, tololoche',
+    temerarios:'balada grupera romántica, piano Rhodes, sintetizadores suaves',
+    norteno:'norteño corrido, acordeón norteño, tuba',
+    ranchera:'ranchera mariachi, trompeta mariachi, violines jalicienses',
+    cumbia:'cumbia tropical colombiana, acordeón, caja vallenata, guacharaca',
+    tropicalisimo:'tropical caliente, órgano Farfisa, bajo eléctrico funky',
+    samuray:'quebradita techno-banda, acordeón, tambora',
+    banda:'banda sinaloense, tuba, trombones, clarinetes',
+    bachata:'bachata sensual, guitarra bossa, requinto, bongós',
+    salsa:'salsa tropical, piano montuno, congas, timbales, trompetas',
+    bolero:'bolero orquestal romántico, piano de cola, cuerdas orquestales',
+    reggaeton:'reggaeton urbano, 808 bass, dembow',
+    pop:'pop internacional, sintetizadores modernos, batería electrónica',
+    rock:'rock alternativo, guitarras eléctricas, bajo potente',
+    electronic:'electrónica synthwave, sintetizadores vintage, drum machine',
+    jazz:'jazz blues, piano, contrabajo, batería swing',
+    lofi:'lo-fi hip-hop, piano cálido, vinyl crackle, batería swing',
+    folk:'folk acústico, guitarra acústica, violines, contrabajo',
+  };
+  const tags = styleMap[orchStyle] || orchStyle;
+  const tpl = typeof TEMPLATES !== 'undefined' ? TEMPLATES[orchStyle] : null;
+  const mood = tpl?.mood?.split(',')[0] || 'emotivo';
+  let p = tags + ', ' + bpm + ' BPM, ' + key_sig + ', ' + mood;
+  if (userPrompt?.length > 10) p += '. ' + userPrompt.substring(0,200);
+  return p;
+}
+
+async function generateVoiceWithElevenLabs(text, orchStyle) {
+  const key = getAPIKey('eleven');
+  if (!key || !text) return null;
+  const voices = window._elevenVoices || [];
+  const voiceId = voices[0]?.voice_id || 'pNInz6obpgDQGcFmaJgB';
+  try {
+    const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+voiceId, {
+      method:'POST',
+      headers:{'xi-api-key':key,'Content-Type':'application/json'},
+      body: JSON.stringify({
+        text: text.substring(0,500),
+        model_id:'eleven_multilingual_v2',
+        voice_settings:{stability:0.5,similarity_boost:0.75,style:0.4,use_speaker_boost:true}
+      })
+    });
+    if (!res.ok) return null;
+    const ab = await (await res.blob()).arrayBuffer();
+    return await getCtx().decodeAudioData(ab);
+  } catch(e) { return null; }
+}
+
+let _pwaInstallEvent = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); _pwaInstallEvent = e;
+});
+
+function installPWA() {
+  if (_pwaInstallEvent) {
+    _pwaInstallEvent.prompt();
+    _pwaInstallEvent.userChoice.then(c => {
+      if(c.outcome==='accepted') toast('✅ PipoRadio instalada como app');
+      _pwaInstallEvent = null;
+    });
+  } else {
+    toast('📱 En Chrome/Edge: menú ⋮ → "Instalar PipoRadio"');
+  }
+}
+
+function copyShareUrl() {
+  const url = document.getElementById('shareUrl')?.value || window.location.href;
+  navigator.clipboard?.writeText(url)
+    .then(() => toast('📋 URL copiada al portapapeles'))
+    .catch(() => { document.getElementById('shareUrl')?.select(); document.execCommand('copy'); toast('📋 URL copiada'); });
+}
+
+function installPWAManifest() {
+  const manifest = {
+    name:'PipoRadio — AI Music Studio', short_name:'PipoRadio',
+    description:'Estudio musical con IA. Genera canciones con calidad de estudio.',
+    start_url: window.location.pathname,
+    display:'standalone', background_color:'#080808', theme_color:'#080808',
+    icons:[{
+      src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23080808' width='100' height='100' rx='18'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E%F0%9F%93%BB%3C/text%3E%3C/svg%3E",
+      sizes:'512x512', type:'image/svg+xml'
+    }]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const link = document.getElementById('pwa-manifest');
+  if (link) link.href = URL.createObjectURL(blob);
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   drawArt(document.getElementById('ptArt'),999);
+  installPWAManifest();
   setTimeout(refreshUI, 120);
   setTimeout(()=>{
     initMixer();
