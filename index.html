@@ -4505,7 +4505,7 @@ async function generateSong() {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generar Canción Pro'; }
     toast('⚠️ Timeout — reduciendo duración e intentando de nuevo...');
     document.getElementById('songDur').value = '45';
-  }, 60000);
+  }, 480000); // 8 minutes timeout
 
   try {
     // ── STEP 1: Análisis ──
@@ -4622,9 +4622,39 @@ async function generateSong() {
     if (nameEl) nameEl.value = '';
 
   } catch (err) {
-    addLog('⚠️ Error: '+err.message);
-    toast('⚠️ Error generando: '+err.message);
-    console.error('generateSong error:', err);
+    if (err.message === 'SIN_CREDITOS') {
+      // Fall back to local synthesis
+      addLog('🎵 Generando con síntesis local...');
+      toast('💳 Sin créditos en udioapi.pro — usando síntesis local');
+      try {
+        const ctx = getCtx();
+        const stemInst   = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'inst');
+        const stemAccomp  = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'accomp');
+        const stemDrums   = await synthStem(ctx, Math.min(durVal,45), bpm, keyVal, orchStyle, 'drums');
+        setStep(3); addLog('Mezclando...');
+        const mixedBuf = await mixStems({ inst:stemInst, accomp:stemAccomp, drums:stemDrums }, Math.min(durVal,45));
+        setStep(4); setStep(5);
+        const song = {
+          id: Date.now(), name: nameVal || genName(),
+          genre: orchToGenre(orchStyle), orchStyle, bpm, key: keyVal,
+          duration: Math.min(durVal,45), prompt, lyrics,
+          artSeed: Math.random()*10000|0, buffer: mixedBuf,
+          createdAt: new Date().toISOString(), source: 'local',
+        };
+        S.songs.unshift(song); saveDB(song); saveLS();
+        refreshUI(); refreshSidebarLib();
+        setTimeout(() => playSong(0), 300);
+        addLog('✅ Generado con síntesis local — recarga créditos para música real');
+        toast('🎵 Generado localmente — recarga créditos en udioapi.pro para música real');
+      } catch(e2) {
+        addLog('⚠️ Error en síntesis local: ' + e2.message);
+        toast('⚠️ Error: ' + e2.message);
+      }
+    } else {
+      addLog('⚠️ Error: '+err.message);
+      toast('⚠️ ' + err.message);
+      console.error('generateSong error:', err);
+    }
   } finally {
     clearTimeout(_genTimeout);
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generar Canción Pro'; }
@@ -5516,7 +5546,20 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
 
   if (!genRes.ok) {
     const errText = await genRes.text();
-    throw new Error('udioapi.pro error ' + genRes.status + ': ' + errText.substring(0,150));
+    const status = genRes.status;
+    
+    if (status === 402) {
+      // No credits — clear message and fallback to local synthesis
+      addLog('⚠️ Sin créditos en udioapi.pro');
+      addLog('💡 Recarga créditos en udioapi.pro/pricing');
+      addLog('🔄 Usando síntesis local como alternativa...');
+      // Disable Suno mode temporarily for this generation
+      throw new Error('SIN_CREDITOS');
+    }
+    if (status === 401) {
+      throw new Error('API key de udioapi.pro inválida — verifica en Ajustes');
+    }
+    throw new Error('udioapi.pro error ' + status + ': ' + errText.substring(0,150));
   }
 
   const genData = await genRes.json();
@@ -5526,9 +5569,9 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
   addLog('⏳ Generando (task: ' + taskId + ') — tarda ~60-90s...');
 
   // Poll for completion
-  for (let i = 0; i < 60; i++) {
-    await sleep(4000);
-    if (i % 3 === 0) addLog('⏳ Procesando... ' + (i*4) + 's');
+  for (let i = 0; i < 90; i++) {
+    await sleep(5000);
+    if (i % 2 === 0) addLog('⏳ Procesando... ' + (i*5) + 's / ~90s normal en Suno V4.5');
 
     let pollRes;
     try {
@@ -5547,35 +5590,50 @@ async function generateWithSuno(prompt, orchStyle, bpm, key_sig, dur) {
 
     if (!pollRes.ok) continue;
 
-    const pollData = await pollRes.json();
-    const clips = pollData?.data || pollData?.clips || (Array.isArray(pollData) ? pollData : []);
-    const clip = Array.isArray(clips) ? clips[0] : clips;
+    let pollData;
+    try { pollData = await pollRes.json(); } catch(e) { continue; }
+    
+    // Log raw response every 30s for debugging
+    if (i % 8 === 0) addLog('📡 Estado: ' + JSON.stringify(pollData).substring(0,80));
 
-    if (!clip) continue;
+    // udioapi.pro v2 response formats
+    const rawData = pollData?.data || pollData?.clips || pollData?.songs || pollData;
+    const clips = Array.isArray(rawData) ? rawData : (rawData ? [rawData] : []);
+    const clip = clips[0];
 
-    const status = clip?.status || clip?.state || '';
-    const audioUrl = clip?.audio_url || clip?.audioUrl || clip?.url;
+    if (!clip) {
+      // Check top-level status
+      const topStatus = pollData?.status || pollData?.state || '';
+      const topUrl = pollData?.audio_url || pollData?.audioUrl || pollData?.url;
+      if ((topStatus === 'complete' || topStatus === 'SUCCESS') && topUrl) {
+        addLog('✅ Audio listo!');
+        const audioRes = await fetch(topUrl);
+        const ab = await audioRes.arrayBuffer();
+        const buf = await getCtx().decodeAudioData(ab);
+        return { buffer: buf, name: songTitle, taskId };
+      }
+      continue;
+    }
 
-    if ((status === 'complete' || status === 'SUCCESS' || status === 'streaming') && audioUrl) {
-      addLog('✅ Audio listo: ' + (clip.title || clip.id || 'canción generada'));
-      addLog('📥 Descargando audio...');
+    const status = clip?.status || clip?.state || clip?.task_status || '';
+    const audioUrl = clip?.audio_url || clip?.audioUrl || clip?.url || clip?.output_url;
+
+    if (audioUrl && (status === 'complete' || status === 'SUCCESS' || 
+        status === 'streaming' || status === 'SUCCEEDED' || audioUrl.includes('http'))) {
+      addLog('✅ Audio listo: ' + (clip.title || clip.id || 'canción'));
+      addLog('📥 Descargando...');
       const audioRes = await fetch(audioUrl);
-      if (!audioRes.ok) throw new Error('No se pudo descargar el audio');
+      if (!audioRes.ok) throw new Error('Error descargando audio: ' + audioRes.status);
       const ab = await audioRes.arrayBuffer();
       const buf = await getCtx().decodeAudioData(ab);
-      return {
-        buffer: buf,
-        name: clip.title || songTitle,
-        taskId: taskId,
-        imageUrl: clip.image_url || clip.imageUrl,
-      };
+      return { buffer: buf, name: clip.title || songTitle, taskId, imageUrl: clip.image_url };
     }
 
-    if (status === 'error' || status === 'FAILED') {
-      throw new Error('Generación falló: ' + (clip?.error || clip?.message || 'error desconocido'));
+    if (status === 'error' || status === 'FAILED' || status === 'failed') {
+      throw new Error('Generación falló: ' + (clip?.error || clip?.message || status));
     }
   }
-  throw new Error('Timeout: la generación tardó más de 4 minutos. Intenta de nuevo.');
+  throw new Error('Timeout (>4min). Suno puede estar ocupado — intenta de nuevo en unos minutos.');
 }
 
 function buildSunoPrompt(userPrompt, orchStyle, bpm, key_sig) {
